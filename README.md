@@ -204,11 +204,11 @@ never hardcoded to "Your Area".
 Stored in Twenty (`heroLede.markdown`):
 
 ```html
-PermitOps turns job inputs into <mark style="background:#FFEB3B; border-radius:2px; padding:0 2px">(like yours)</mark> for other contractors in {{area}}.
+Acme turns rough inputs into <mark style="background:#FFEB3B; border-radius:2px; padding:0 2px">(like yours)</mark> for other teams in {{area}}.
 ```
 
-Preview with `?area=Philadelphia` renders: yellow-highlighted "(like yours)"
-plus solid-underlined "Philadelphia". With no `?area=`, the same string
+Preview with `?area=Springfield` renders: yellow-highlighted "(like yours)"
+plus solid-underlined "Springfield". With no `?area=`, the same string
 renders the highlight plus a dashed `{{area}}` token (template mode).
 
 ### Gotchas (fixed, documented so they stay fixed)
