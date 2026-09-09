@@ -474,12 +474,16 @@ Per-offer dashboards: `https://open-offer-builder.vercel.app/offer/<slug>`
 (`<slug>` = offer id or slugified title; `/offer` alone serves the first
 `ACTIVE` offer).
 
-Installed server-side (no clicks needed): **My First Dashboard**
-(`f31ecf3b-…`) now has an **Offer Funnel** tab (position 1) with a full-width
-`IFRAME` widget (`d82a7a4a-…`, 12 cols × 30 rows) pointing at `/offer` —
-inserted directly into `core."pageLayoutTab"` / `core."pageLayoutWidget"`
-over the Tailscale Postgres connection, copying the live `Cold Dialer`
-precedent. Just refresh Twenty to see it.
+Installed server-side (no clicks needed): a dedicated **Offer Funnel
+Dashboard** (`8583356f-…`, position 2) with layout `899b4100-…`, tab
+`33a28165-…`, and a full-width `IFRAME` widget (`0071f935-…`, 12 cols ×
+30 rows) pointing at `/offer` — inserted directly into `core."pageLayout"`
+/ `"pageLayoutTab"` / `"pageLayoutWidget"` plus the workspace `dashboard`
+record over the Tailscale Postgres connection, following the live `Cold
+Dialer` conventions exactly (`Custom` application, `universalIdentifier` =
+row id, `configuration: {url, configurationType: "IFRAME"}`). An earlier
+attempt on My First Dashboard is soft-deleted. Just refresh Twenty to see
+it in the left nav under Dashboards.
 
 Works whether you open Twenty via `https://twenty.inferencesaver.com` or over
 Tailscale via node01 (`http://100.98.241.63:3000`) — both origins are in the
