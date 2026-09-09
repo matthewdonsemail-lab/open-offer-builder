@@ -505,6 +505,31 @@ Notes:
 - The editor's save → preview bridge (localStorage + postMessage + 20s poll)
   keeps embedded views fresh after each save.
 
+## Railcode port (internal surfaces)
+
+`railcode/offer-builder/` is a Railcode apps-v2 port of the **internal**
+surfaces only — builder, preview, `/dashboard?embed=1`, and the internal
+`/api/*` worker (Hono, `server/index.ts`). Live (private):
+`https://offer-builder.listeningkit.railcode.app/`, embedded in the Twenty
+Offer Funnel Dashboard.
+
+- Auth is the Railcode org session (`ctx.user`) — the Twenty-password login
+  is retired here (tailnet Postgres is unreachable from the worker).
+  `POST /api/auth/login` returns 410; `GET /api/auth/me` returns the caller.
+- `TWENTY_API_KEY` lives in worker secrets (`railcode secrets set`), the
+  Twenty host is a worker constant, `egress:` allows it in `manifest.yaml`.
+- **Not ported on purpose:** `/offer` + `/api/public/*` (anonymous prospect
+  capture is impossible on Railcode — org members only). The public funnel
+  stays on Vercel.
+
+```bash
+cd railcode/offer-builder
+npm install
+railcode dev --port 5234   # worker needs TWENTY_API_KEY in local env
+railcode manifest validate
+railcode deploy --private  # railcode apps set-access to open to the org
+```
+
 ### Tailscale notes
 
 - **Local iframe test before Vercel:** `tailscale funnel 3000` (or

@@ -1,0 +1,34 @@
+{
+  "name": "offer-builder-railcode",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "railcode dev",
+    "typecheck": "tsc --noEmit --skipLibCheck"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.26.24",
+    "@heroicons/react": "^2.2.0",
+    "@railcode/sdk": "^0.4.0",
+    "@tanstack/react-query": "^5.28.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.11.0",
+    "hono": "^4.6.0",
+    "lucide-react": "^0.400.0",
+    "motion": "^13.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.1",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.1"
+  }
+}

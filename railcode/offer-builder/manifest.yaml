@@ -1,0 +1,3 @@
+run_as: app
+egress:
+  - twenty.inferencesaver.com

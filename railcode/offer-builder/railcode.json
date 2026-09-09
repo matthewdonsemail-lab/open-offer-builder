@@ -1,0 +1,6 @@
+{
+  "app": "offer-builder",
+  "type": "hono+vite",
+  "dist": "dist/client",
+  "server": "dist/server/index.js"
+}
