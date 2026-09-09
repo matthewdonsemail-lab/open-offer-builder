@@ -3,9 +3,10 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Spokes } from '@/components/ui/Spinner';
-import { Gift, ChevronDown, LogOut, Menu, X, Bell } from 'lucide-react';
+import { Gift, ChevronDown, LogOut, Menu, X, Bell, LayoutDashboard } from 'lucide-react';
 
 const navItems = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/offers', label: 'Offers', icon: Gift },
 ];
 
@@ -14,6 +15,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const currentNav = navItems.find((n) => location.pathname.startsWith(n.to));
+
+  // Embed mode (?embed=1, e.g. Twenty dashboard iframe): no sidebar/topbar.
+  const isEmbed = new URLSearchParams(location.search).get('embed') === '1';
+  if (isEmbed) {
+    return (
+      <div className="min-h-screen bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] font-sans antialiased">
+        {children}
+      </div>
+    );
+  }
 
   const isOfferDetail = useMemo(() => {
     return /^\/offers\/[^/]+$/.test(location.pathname) && location.pathname !== '/offers/new';

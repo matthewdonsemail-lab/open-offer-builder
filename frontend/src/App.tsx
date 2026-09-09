@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ToastProvider } from '@/components/ui/Toast';
 import { Layout } from '@/components/common/Layout';
 import { LoginPage } from '@/pages/LoginPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { OffersPage } from '@/pages/OffersPage';
 import { OfferDetailPage } from '@/pages/OfferDetailPage';
 import { PreviewPage } from '@/pages/PreviewPage';
@@ -21,6 +22,7 @@ function AuthenticatedApp() {
   return (
     <Layout>
       <Routes>
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/offers" element={<OffersPage />} />
         <Route path="/offers/new" element={<OfferDetailPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />
