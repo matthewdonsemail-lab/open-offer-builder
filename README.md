@@ -1,5 +1,17 @@
 # Open Offer Builder
 
+> 🎥 **Watch the walkthrough:** https://x.com/matthewsoldit/status/2097482754724389058
+
+Hi — I'm **Matthew**, a Sales Engineer. I like contributing and building out
+GTM systems that let me do what I want **for free** — and I like sharing what
+I make and what I can do. This repo is one of those builds: a complete
+offer-funnel system on top of Twenty CRM, open source, no gatekeeping.
+
+If you want me to try and figure out stuff for what *you're* doing — a funnel,
+an integration, some gnarly Twenty schema problem — let me know.
+
+---
+
 Offer-funnel builder backed by Twenty CRM. Each offer is a full funnel — landing hero + video + qualifier quiz → contact capture → Calendly booking → booked thank-you with videos — with a disqualified path for poor-fit prospects. Everything is authored in the Offer Detail editor and stored on the `agencyOffers` object in Twenty.
 
 ## Architecture
@@ -329,3 +341,17 @@ VITE_API_URL=http://localhost:4000
 ## License
 
 MIT
+
+---
+
+## Work with me
+
+I'm Matthew, a Sales Engineer who builds GTM systems in the open — free
+tooling, shared playbooks, no black boxes. Everything in this repo is how I
+actually do it.
+
+🎥 Walkthrough: https://x.com/matthewsoldit/status/2097482754724389058
+
+Got something you're stuck on — a funnel that won't convert, a CRM schema
+that fights back, some integration nobody has documented? Reach out and I'll
+try to figure it out with you.
