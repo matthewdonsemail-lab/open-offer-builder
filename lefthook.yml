@@ -1,0 +1,19 @@
+# Git hooks (Lefthook). One-time setup per clone: `bunx lefthook install`.
+# Run manually any time: `bunx lefthook run pre-push`.
+
+pre-push:
+  jobs:
+    - name: env-check
+      run: node scripts/check-env.mjs
+      # Every process.env.X / import.meta.env.VITE_X referenced in code
+      # must be documented in .env.example (placeholders only, never secrets).
+
+    - name: secrets-scan
+      run: node scripts/scan-secrets.mjs
+      # Staged changes must not contain real env files, JWTs, private keys,
+      # credentialed DB URLs, or live secret prefixes.
+
+    - name: typecheck-frontend
+      run: bun run --cwd frontend typecheck
+      # Backend tsc is intentionally excluded: backend/src/lib/twenty-client.ts
+      # has pre-existing type errors unrelated to this gate.

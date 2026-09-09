@@ -7,8 +7,11 @@ build/
 *.tsbuildinfo
 
 # Local env (secrets — TWENTY_API_KEY, JWT secrets live here)
+# NOTE: bare .env is also ignored; only .env.example is committed.
+.env
 .env.local
 .env.*.local
+!.env.example
 
 # Vite cache
 **/.vite/
@@ -16,6 +19,13 @@ build/
 # Generated from vite.config.ts by tsc
 frontend/vite.config.js
 frontend/vite.config.d.ts
+
+# Lefthook personal overrides (per-machine hook tweaks, never shared)
+.lefthook-local.yml
+
+# Logs / coverage
+*.log
+coverage/
 
 # OS / editor
 .DS_Store

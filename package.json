@@ -10,6 +10,7 @@
     "dev:raw": "concurrently --raw \"bun run dev:backend\" \"bun run dev:frontend\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "lefthook": "^2.1.12"
   }
 }
