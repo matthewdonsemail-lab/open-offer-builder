@@ -1,0 +1,47 @@
+# Open Offer Builder - Project Context
+
+## Overview
+This is an open-source offer management system built on the Twenty CRM architecture. It focuses on creating, managing, and previewing offers stored in Twenty CRM's `agencyOffers` object.
+
+## Key Technologies
+- **Backend**: Node.js, Express, TypeScript, Twenty CRM REST API
+- **Frontend**: React 18, Vite, TypeScript, Tailwind CSS, TanStack Query
+- **Design System**: Twenty CRM style (use `--ods-*` CSS variables)
+
+## Twenty CRM Integration
+- Base URL: `https://twenty.inferencesaver.com/rest`
+- Object: `agencyOffers`
+- Fields: title, name, heroH1, heroLede (rich text), videoUrl
+- Authentication: JWT tokens stored in localStorage as `offer-builder-token`
+
+## API Endpoints
+- `GET /api/offers` - List all offers
+- `GET /api/offers/:id` - Get single offer
+- `POST /api/offers` - Create offer
+- `PATCH /api/offers/:id` - Update offer
+- `DELETE /api/offers/:id` - Delete offer
+- `GET /preview/:industryId/:id` - Public preview (no auth needed)
+
+## Design Patterns
+- Use `WidgetCard` for all card containers
+- Use `Badge` for status indicators and relation displays
+- Use `@floating-ui/react` with `FloatingPortal` for dropdowns
+- Tables should be full-bleed (no outer padding)
+- Keep heights on 4px grid (28px small, 40px medium)
+
+## Component Index
+- `Layout.tsx` - App shell with sidebar navigation
+- `WidgetCard.tsx` - Twenty-style card component
+- `Badge.tsx` - Status/styled badge component
+- `Toast.tsx` - Notification system with provider
+- `Spinner.tsx` - Loading indicator
+- `OffersPage.tsx` - Table view of all offers
+- `OfferDetailPage.tsx` - Form builder for editing offers
+- `PreviewPage.tsx` - Public preview rendering
+
+## Important Notes
+- Never hardcode hex colors; use `--ods-*` CSS variables
+- Use `useQuery` and `useMutation` from TanStack Query for data fetching
+- All API calls go through `/api/*` proxy (Vite dev proxy configured)
+- Preview route is public and doesn't require authentication
+- The project reuses backend infrastructure from open-twenty-dialer but strips non-offer functionality

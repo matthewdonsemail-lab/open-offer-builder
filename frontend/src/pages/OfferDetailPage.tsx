@@ -1,0 +1,466 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useOffer, useUpdateOffer, useCreateOffer } from '@/lib/api';
+import { WidgetCard } from '@/components/ui/WidgetCard';
+import { Spokes } from '@/components/ui/Spinner';
+import { Badge } from '@/components/ui/Badge';
+import { ProspectSelect } from '@/components/ProspectSelect';
+import { QualifierQuiz } from '@/components/QualifierQuiz';
+import type { QualifierQuizData } from '@/components/QualifierQuiz';
+import { ThankYouEditor } from '@/components/ThankYouEditor';
+import type { ThankYouData } from '@/components/ThankYouEditor';
+import { DisqualifiedForm } from '@/components/DisqualifiedForm';
+import type { DisqualifiedData } from '@/components/DisqualifiedForm';
+import { SettingsForm } from '@/components/SettingsForm';
+import { UtmSwapsForm } from '@/components/UtmSwapsForm';
+import type { UtmSwapsData } from '@/components/UtmSwapsForm';
+import { RichEditor } from '@/components/RichEditor';
+import { resolveAreaTokens } from '@/lib/resolveTokens';
+import { ArrowLeft, Save } from 'lucide-react';
+
+export function OfferDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const isNew = id === 'new';
+
+  const { data: offer, isLoading } = useOffer(isNew ? undefined : id);
+  const updateMutation = useUpdateOffer();
+  const createMutation = useCreateOffer();
+
+  const [title, setTitle] = useState('');
+  const [name, setName] = useState('');
+  const [prospectName, setProspectName] = useState(''); // normalized display name
+  const [heroH1, setHeroH1] = useState('');
+  const [heroLede, setHeroLede] = useState('');
+  const [videoUrl, setVideoUrl] = useState({ primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] as any[] });
+  const [status, setStatus] = useState('DRAFT');
+  const [ctaType, setCtaType] = useState('consultation');
+  const [calendlyUrl, setCalendlyUrl] = useState('');
+  const [metaPixelId, setMetaPixelId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const defaultQuizData: QualifierQuizData = {
+    introTitle: 'See if your market is available - book a strategy call now',
+    introDesc: 'We only work with 1 agency per market — answer a few quick questions.',
+    questions: [
+      { id: 'q1', question: 'What is your current active census?', type: 'Multiple choice', options: [
+        { id: 'q1o1', text: '0-15 Clients (startup)', dq: false, fbLead: true, nextQuestion: 'Go to Q2: Do you have $5,000 (cash o' },
+        { id: 'q1o2', text: '15-40 Clients (growing)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
+        { id: 'q1o3', text: '40-99 Clients (scaling)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
+        { id: 'q1o4', text: '100+ Clients (established)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
+      ]},
+      { id: 'q2', question: 'Do you have $5,000 available to invest in growth this month?', type: 'Multiple choice', options: [
+        { id: 'q2o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
+        { id: 'q2o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
+      ]},
+      { id: 'q3', question: 'Does your home care agency serve the area shown above?', type: 'Multiple choice', options: [
+        { id: 'q3o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
+        { id: 'q3o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
+      ]},
+    ],
+    contactInfo: 'Collect at end',
+    onQualified: 'Show embed',
+    calendlyEmbed: '',
+  };
+  const [quizData, setQuizData] = useState<QualifierQuizData>(defaultQuizData);
+  const [thankYouData, setThankYouData] = useState<ThankYouData | undefined>(undefined);
+  const [disqualifiedData, setDisqualifiedData] = useState<DisqualifiedData | undefined>(undefined);
+  const [utmSwaps, setUtmSwaps] = useState<UtmSwapsData | undefined>(undefined);
+
+  useEffect(() => {
+    if (offer) {
+      setTitle(offer.title || '');
+      setName(offer.name || (offer as any).prospectId || '');
+      setHeroH1(offer.heroH1 || '');
+      setHeroLede(offer.heroLede?.markdown || '');
+      setVideoUrl(offer.videoUrl || { primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] });
+      setStatus((offer.status as string) || 'DRAFT');
+      setCtaType((offer.ctaType as string) || 'consultation');
+      const cal = (offer as any).calendlyUrl || '';
+      setCalendlyUrl(cal);
+      setMetaPixelId((offer as any).metaPixelId || '');
+      // hydrate quiz if stored as JSON string or array — normalize string options to new object shape
+      const rawQuiz = (offer as any).quizConfig || (offer as any).quiz;
+      if (rawQuiz) {
+        try {
+          const parsed = typeof rawQuiz === 'string' ? JSON.parse(rawQuiz) : rawQuiz;
+          if (Array.isArray(parsed) && parsed.length) {
+            const normalized = parsed.map((q: any) => ({
+              id: q.id || `q-${Math.random().toString(36).slice(2,6)}`,
+              question: q.question || q.text || '',
+              type: q.type || 'Multiple choice',
+              options: (q.options || []).map((o: any) =>
+                typeof o === 'string'
+                  ? { id: `opt-${Math.random().toString(36).slice(2,6)}`, text: o, dq: false, fbLead: true, nextQuestion: '' }
+                  : { id: o.id || `opt-${Math.random().toString(36).slice(2,6)}`, text: o.text || o.label || '', dq: !!o.dq, fbLead: o.fbLead ?? true, nextQuestion: o.nextQuestion || '' }
+              ),
+            }));
+            setQuizData((prev) => ({ ...prev, questions: normalized, calendlyEmbed: cal || prev.calendlyEmbed }));
+          }
+        } catch {}
+      } else if (cal) {
+        setQuizData((prev) => ({ ...prev, calendlyEmbed: cal }));
+      }
+      const rawThank = (offer as any).thankYouConfig;
+      if (rawThank) {
+        try {
+          const parsed = typeof rawThank === 'string' ? JSON.parse(rawThank) : rawThank;
+          if (parsed && typeof parsed === 'object') setThankYouData(parsed);
+        } catch {}
+      }
+      const rawDisq = (offer as any).disqualifiedConfig;
+      if (rawDisq) {
+        try {
+          const parsed = typeof rawDisq === 'string' ? JSON.parse(rawDisq) : rawDisq;
+          if (parsed && typeof parsed === 'object') setDisqualifiedData(parsed);
+        } catch {}
+      }
+      const rawUtm = (offer as any).utmSwaps;
+      if (rawUtm) {
+        try {
+          const parsed = typeof rawUtm === 'string' ? JSON.parse(rawUtm) : rawUtm;
+          if (parsed && typeof parsed === 'object') setUtmSwaps(parsed);
+        } catch {}
+      }
+    }
+  }, [offer]);
+
+  const [activeTab, setActiveTab] = useState<'landing'|'thankyou'|'disqualified'|'settings'|'utm'|'proposals'>('landing');
+  const TABS: Array<{id:'landing'|'thankyou'|'disqualified'|'settings'|'utm'|'proposals', label:string}> = [
+    { id: 'landing', label: 'Landing page' },
+    { id: 'thankyou', label: 'Thank-you' },
+    { id: 'disqualified', label: 'Disqualified' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'utm', label: 'UTM swaps' },
+    { id: 'proposals', label: 'Proposals' },
+  ];
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    // Try full payload first, then retry without Twenty-missing fields (status/ctaType/quiz) on 400
+    const buildData = (includeExtras: boolean): any => {
+      const base: any = {
+        ...(title && { title }),
+        ...(name && { name }),
+        ...(heroH1 && { heroH1 }),
+        ...(heroLede && { heroLede: { blocknote: null, markdown: heroLede } }),
+        videoUrl,
+        prospectId: name || undefined,
+        quizConfig: quizData.questions,
+        thankYouConfig: thankYouData || undefined,
+        disqualifiedConfig: disqualifiedData || undefined,
+        utmSwaps: utmSwaps || undefined,
+        // prefer QualifierQuiz's calendlyEmbed, fallback to separate state
+        ...( (quizData.calendlyEmbed || calendlyUrl) && { calendlyUrl: quizData.calendlyEmbed || calendlyUrl }),
+      };
+      if (includeExtras) {
+        base.status = status;
+        base.ctaType = ctaType;
+      }
+      return base;
+    };
+    const attempt = async (includeExtras: boolean) => {
+      const data = buildData(includeExtras);
+      console.log('[OfferDetail] saving', isNew ? 'create' : 'update', includeExtras ? 'with extras' : 'without extras', { id, data });
+      console.log('[OfferDetail] JSON:', JSON.stringify(data, null, 2));
+      if (isNew) return createMutation.mutateAsync(data);
+      if (id) return updateMutation.mutateAsync({ id, data });
+      throw new Error('No id');
+    };
+    try {
+      let res;
+      try {
+        res = await attempt(true);
+      } catch (e: any) {
+        const msg = e?.message || '';
+        if (msg.includes("doesn't have any") && msg.includes('status')) {
+          console.warn('[OfferDetail] Twenty missing status/quiz fields — retrying without extras', msg);
+          res = await attempt(false);
+        } else throw e;
+      }
+      console.log('[OfferDetail] saved:', res);
+      navigate('/offers');
+    } catch (err: any) {
+      console.error('[OfferDetail] Failed to save offer:', err);
+      console.log('[OfferDetail] error JSON:', JSON.stringify(err, null, 2));
+      setSaveError(err?.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    navigate('/offers');
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Spokes className="h-8 w-8 text-[var(--ods-brand-600)] mx-auto" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="h-10 px-4 border-b border-[var(--ods-border)] flex items-center justify-between shrink-0">
+        <button
+          onClick={handleCancel}
+          className="flex items-center gap-1 text-[13px] text-[var(--ods-text-secondary,#575757)] hover:text-[var(--ods-text-primary,#18181b)] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-[var(--ods-text-tertiary,#8a8a93)]">
+            {isNew ? 'New Offer' : offer?.title || 'Edit Offer'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isNew ? (
+            <button
+              disabled
+              title="Save first to preview"
+              className="h-7 px-3 text-[13px] text-[var(--ods-text-tertiary,#8a8a93)] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-secondary)] cursor-not-allowed opacity-60"
+            >
+              Preview
+            </button>
+          ) : (
+            <button
+              onClick={() => window.open(`/preview/general/${id}`, '_blank')}
+              className="h-7 px-3 text-[13px] text-[var(--ods-text-secondary,#575757)] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] hover:bg-[var(--ods-bg-secondary,#f0f0f3)] transition-colors"
+            >
+              Preview
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 h-7 px-3 text-[13px] font-medium bg-[var(--ods-brand-600,#2563eb)] text-white rounded-[4px] hover:bg-[var(--ods-brand-600,#1d4ed8)] transition-colors disabled:opacity-50"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Save
+          </button>
+        </div>
+      </div>
+
+      {/* Top-level offer tabs */}
+      <div role="tablist" aria-label="Offer sections" className="flex items-center gap-6 h-10 px-4 border-b border-[var(--ods-border,#e5e5ea)] shrink-0 overflow-x-auto bg-[var(--ods-bg-primary,#ffffff)]">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`h-full shrink-0 border-b-2 text-[13px] font-medium whitespace-nowrap -mb-px transition-colors ${activeTab === t.id ? 'border-[var(--ods-text-primary,#1e2126)] text-[var(--ods-text-primary,#1e2126)]' : 'border-transparent text-[var(--ods-text-secondary,#6b7280)] hover:text-[var(--ods-text-primary,#1e2126)]'}`}
+            style={{ fontFamily: "'Satoshi', system-ui, sans-serif" }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        {saveError && (
+          <div className="mx-auto max-w-4xl flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 p-3 rounded-[6px] text-sm">
+            <span className="font-medium">Save failed:</span> {saveError}
+          </div>
+        )}
+        {activeTab === 'landing' && (
+        <div className="flex flex-col gap-4">
+          {/* Basic Info */}
+          <WidgetCard title="Basic Info">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., How White Sands Auto Added $10K MRR"
+                  className="w-full h-10 px-3 text-[13px] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] focus:outline-none focus:border-[var(--ods-brand-600,#2563eb)]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                  Prospect / Lead — normalized name
+                </label>
+                <ProspectSelect
+                  value={name}
+                  onChange={(id, displayName) => {
+                    setName(id);
+                    setProspectName(displayName);
+                    console.log('[OfferDetail] selected prospect:', { id, displayName });
+                  }}
+                />
+                {name && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant="blue">
+                      {prospectName ? `Selected: ${prospectName}` : `Selected: ${name.slice(0, 8)}…`}
+                    </Badge>
+                    <span className="text-[11px] text-[var(--ods-text-tertiary,#8a8a93)]">
+                      normalized — stored as <code className="bg-[var(--ods-bg-secondary)] px-1 py-0.5 rounded-[3px] border border-[var(--ods-border)]">name</code>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </WidgetCard>
+
+          {/* Hero Section — free input with separate toolbars + live preview */}
+          <WidgetCard title="Hero Section — free input">
+            <div className="space-y-5">
+              <div>
+                <label className="block text-[11px] font-semibold tracking-wider text-[var(--ods-text-tertiary)] mb-1.5">
+                  Hero H1 — free input (no {'{{area}}'} token)
+                </label>
+                <RichEditor
+                  value={heroH1}
+                  onChange={setHeroH1}
+                  placeholder="Main headline — select text then apply color/highlight (e.g., We'll Send You an Additional 8-10+ Qualified Veteran Referrals Per Day)"
+                  showAreaToken={false}
+                  minHeight="48px"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold tracking-widest uppercase text-[var(--ods-text-tertiary)] mb-1.5">
+                  Hero Lede — free input (template vs tailored)
+                </label>
+                <RichEditor
+                  value={heroLede}
+                  onChange={setHeroLede}
+                  placeholder="Supporting text — use {{area}} for personalization (e.g., PermitOps turns job inputs into permit requirement guidance, fee-estimate signals, and compliance-risk indicators like (like yours) for other contractors in {{area}}.)"
+                  showAreaToken={true}
+                  minHeight="80px"
+                />
+                <p className="mt-1 text-[11px] text-[var(--ods-text-tertiary)]">
+                  Template mode: keep <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">{"{{area}}"}</code> in the lede — preview resolves it only from an explicit <code>?area=</code> param, otherwise shows a dashed {"{{area}}"} token (never hardcoded, never pulled from a prospect). Tailored mode: replace <code>{"{{area}}"}</code> with a real city. For the H1, use highlight for <code>(like yours)</code> and color freely.
+                </p>
+              </div>
+              {/* Live preview inside builder — shows inferred Twenty HTML */}
+              <div className="rounded-[6px] border border-dashed border-[var(--ods-border)] bg-[#fafafb]/50 p-3">
+                <span className="block text-[11px] font-semibold tracking-widest uppercase text-[var(--ods-text-tertiary)] mb-2">Live preview (inside builder, inferred from Twenty)</span>
+                <h3
+                  className="text-[18px] font-bold leading-tight text-[#0D2A4C] mb-2"
+                  style={{ fontFamily: 'Satoshi, sans-serif' }}
+                  dangerouslySetInnerHTML={{ __html: heroH1 || '<span class="text-[var(--ods-text-tertiary)]">Hero H1 preview…</span>' }}
+                />
+                <div
+                  className="text-[13px] leading-relaxed text-[#0D2A4C]/70"
+                  dangerouslySetInnerHTML={{
+                    __html: resolveAreaTokens(heroLede || '', {
+                      area: (() => {
+                        try {
+                          return new URLSearchParams(window.location.search).get('area') || '';
+                        } catch {
+                          return '';
+                        }
+                      })(),
+                      keepTokenIfMissing: true,
+                    }) || '<span class="text-[var(--ods-text-tertiary)]">Hero lede preview…</span>',
+                  }}
+                />
+                <p className="mt-2 text-[11px] text-[var(--ods-text-tertiary)]">
+                  Preview uses the same <code className="bg-white px-1 rounded border">dangerouslySetInnerHTML</code> as <code className="bg-white px-1 rounded border">PreviewPage</code> — what you see here is what Twenty will render.
+                </p>
+              </div>
+            </div>
+          </WidgetCard>
+
+          {/* Video URL */}
+          <WidgetCard title="Video URL">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                  Primary Link Label
+                </label>
+                <input
+                  type="text"
+                  value={videoUrl.primaryLinkLabel}
+                  onChange={(e) => setVideoUrl({ ...videoUrl, primaryLinkLabel: e.target.value })}
+                  placeholder="e.g., Watch Video"
+                  className="w-full h-10 px-3 text-[13px] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] focus:outline-none focus:border-[var(--ods-brand-600,#2563eb)]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                  Primary Link URL
+                </label>
+                <input
+                  type="url"
+                  value={videoUrl.primaryLinkUrl}
+                  onChange={(e) => setVideoUrl({ ...videoUrl, primaryLinkUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full h-10 px-3 text-[13px] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] focus:outline-none focus:border-[var(--ods-brand-600,#2563eb)]"
+                />
+              </div>
+            </div>
+          </WidgetCard>
+        </div>
+        )}
+
+        {activeTab === 'thankyou' && (
+          <ThankYouEditor
+            value={thankYouData}
+            onChange={(next) => {
+              setThankYouData(next);
+              console.log('[OfferDetail] thankYou change', JSON.stringify(next, null, 2).slice(0, 400));
+            }}
+          />
+        )}
+        {activeTab === 'disqualified' && (
+          <DisqualifiedForm
+            value={disqualifiedData}
+            onChange={(next) => {
+              setDisqualifiedData(next as any);
+              console.log('[OfferDetail] disqualified change', JSON.stringify(next, null, 2).slice(0, 400));
+            }}
+          />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsForm
+            value={{ metaPixelId, status, ctaType }}
+            onChange={(next) => {
+              setMetaPixelId(next.metaPixelId);
+              setStatus(next.status);
+              setCtaType(next.ctaType);
+            }}
+            title={title}
+          />
+        )}
+        {activeTab === 'utm' && (
+          <UtmSwapsForm
+            value={utmSwaps}
+            onChange={(next) => {
+              setUtmSwaps(next);
+              console.log('[OfferDetail] utmSwaps change', JSON.stringify(next, null, 2).slice(0, 400));
+            }}
+          />
+        )}
+        {activeTab === 'proposals' && (
+          <div className="mx-auto max-w-4xl py-12 text-center">
+            <WidgetCard title="Proposals">
+              <p className="text-[13px] text-[var(--ods-text-secondary)]">Proposals content — link or embed proposals for this offer.</p>
+            </WidgetCard>
+          </div>
+        )}
+
+        {activeTab === 'landing' && (
+          <QualifierQuiz
+            value={quizData}
+            onChange={(next) => {
+              setQuizData(next);
+              setCalendlyUrl(next.calendlyEmbed);
+              console.log('[OfferDetail] qualifier quiz change', JSON.stringify(next, null, 2).slice(0, 400));
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}

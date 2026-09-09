@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Local env (secrets — TWENTY_API_KEY, JWT secrets live here)
+.env.local
+.env.*.local
+
+# Vite cache
+**/.vite/
+
+# Generated from vite.config.ts by tsc
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
