@@ -280,7 +280,7 @@ export function OffersPage() {
                         fetch(`/api/offers/${offer.id}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('offer-builder-token')}` },
-                          body: JSON.stringify({ ctaType: v }),
+                          body: JSON.stringify({ ctaType: v.toUpperCase() }),
                         }).then(() => window.location.reload());
                       }}
                       options={CTA_OPTIONS}

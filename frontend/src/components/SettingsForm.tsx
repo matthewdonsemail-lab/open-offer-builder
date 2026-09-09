@@ -14,9 +14,9 @@ const STATUS_OPTIONS = [
 ];
 
 const CTA_OPTIONS = [
-  { value: 'consultation', label: 'Consultation', dotColor: 'bg-blue-500', bgTint: 'bg-blue-500/10', textColor: 'text-blue-700' },
-  { value: 'pricing', label: 'Pricing', dotColor: 'bg-green-500', bgTint: 'bg-green-500/10', textColor: 'text-green-700' },
-  { value: 'custom', label: 'Custom', dotColor: 'bg-gray-500', bgTint: 'bg-gray-500/10', textColor: 'text-gray-700' },
+  { value: 'CONSULTATION', label: 'Consultation', dotColor: 'bg-blue-500', bgTint: 'bg-blue-500/10', textColor: 'text-blue-700' },
+  { value: 'PRICING', label: 'Pricing', dotColor: 'bg-green-500', bgTint: 'bg-green-500/10', textColor: 'text-green-700' },
+  { value: 'CUSTOM', label: 'Custom', dotColor: 'bg-gray-500', bgTint: 'bg-gray-500/10', textColor: 'text-gray-700' },
 ];
 
 interface Props {

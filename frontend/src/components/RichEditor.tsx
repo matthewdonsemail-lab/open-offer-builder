@@ -142,7 +142,7 @@ export function RichEditor({ value, onChange, placeholder, showAreaToken, minHei
         className="w-full p-3 text-[13px] border border-[var(--ods-border)] rounded-[6px] bg-white focus:outline-none focus:border-[var(--ods-brand-600)] min-h-[40px] empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ods-text-tertiary)] empty:before:text-[13px]"
         style={{ minHeight }}
       />
-      <p className="text-[11px] text-[var(--ods-text-tertiary)]">Free input — select text and apply color/highlight. {showAreaToken && 'Use {{area}} for prospect city personalization (template vs tailored).'} Stored as HTML in Twenty.</p>
+      <p className="text-[11px] text-[var(--ods-text-tertiary)]">Select text, then pick a style.</p>
     </div>
   );
 }

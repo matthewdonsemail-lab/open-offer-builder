@@ -34,7 +34,7 @@ export function OfferDetailPage() {
   const [heroLede, setHeroLede] = useState('');
   const [videoUrl, setVideoUrl] = useState({ primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] as any[] });
   const [status, setStatus] = useState('DRAFT');
-  const [ctaType, setCtaType] = useState('consultation');
+  const [ctaType, setCtaType] = useState('CONSULTATION');
   const [calendlyUrl, setCalendlyUrl] = useState('');
   const [metaPixelId, setMetaPixelId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,7 +74,7 @@ export function OfferDetailPage() {
       setHeroLede(offer.heroLede?.markdown || '');
       setVideoUrl(offer.videoUrl || { primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] });
       setStatus((offer.status as string) || 'DRAFT');
-      setCtaType((offer.ctaType as string) || 'consultation');
+      setCtaType(((offer.ctaType as string) || 'CONSULTATION').toUpperCase());
       const cal = (offer as any).calendlyUrl || '';
       setCalendlyUrl(cal);
       setMetaPixelId((offer as any).metaPixelId || '');
@@ -339,12 +339,12 @@ export function OfferDetailPage() {
                   minHeight="80px"
                 />
                 <p className="mt-1 text-[11px] text-[var(--ods-text-tertiary)]">
-                  Template mode: keep <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">{"{{area}}"}</code> in the lede — preview resolves it only from an explicit <code>?area=</code> param, otherwise shows a dashed {"{{area}}"} token (never hardcoded, never pulled from a prospect). Tailored mode: replace <code>{"{{area}}"}</code> with a real city. For the H1, use highlight for <code>(like yours)</code> and color freely.
+                  {"{{area}}"} = template · real city = tailored.
                 </p>
               </div>
               {/* Live preview inside builder — shows inferred Twenty HTML */}
               <div className="rounded-[6px] border border-dashed border-[var(--ods-border)] bg-[#fafafb]/50 p-3">
-                <span className="block text-[11px] font-semibold tracking-widest uppercase text-[var(--ods-text-tertiary)] mb-2">Live preview (inside builder, inferred from Twenty)</span>
+                <span className="block text-[11px] font-semibold tracking-widest uppercase text-[var(--ods-text-tertiary)] mb-2">Live preview</span>
                 <h3
                   className="text-[18px] font-bold leading-tight text-[#0D2A4C] mb-2"
                   style={{ fontFamily: 'Satoshi, sans-serif' }}
@@ -366,7 +366,7 @@ export function OfferDetailPage() {
                   }}
                 />
                 <p className="mt-2 text-[11px] text-[var(--ods-text-tertiary)]">
-                  Preview uses the same <code className="bg-white px-1 rounded border">dangerouslySetInnerHTML</code> as <code className="bg-white px-1 rounded border">PreviewPage</code> — what you see here is what Twenty will render.
+                  Matches PreviewPage.
                 </p>
               </div>
             </div>
