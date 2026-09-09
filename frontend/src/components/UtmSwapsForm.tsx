@@ -33,8 +33,8 @@ const DEFAULT_UTM: UtmSwapsData = {
   rules: [
     {
       id: 'utm1',
-      match: { utm_source: 'google', utm_campaign: 'whitesands' },
-      swaps: { heroH1: 'For White Sands Home Care Agencies…', heroLede: 'Special for Google traffic', videoUrl: '' },
+      match: { utm_source: 'google', utm_campaign: 'example' },
+      swaps: { heroH1: 'For Acme Teams…', heroLede: 'Special for Google traffic', videoUrl: '' },
     },
   ],
 };
@@ -84,7 +84,7 @@ export function UtmSwapsForm({
     <div className="mx-auto max-w-4xl space-y-4">
       <WidgetCard title="UTM Swaps — per-UTM text overrides">
         <p className="text-[12px] text-[var(--ods-text-secondary)] mb-3">
-          Type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks. When URL contains <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">?utm_source=google&utm_campaign=whitesands</code>, the matching rule’s swaps replace the default hero/video/quiz intro. First matching rule wins.
+          Type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks. When URL contains <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">?utm_source=google&utm_campaign=example</code>, the matching rule’s swaps replace the default hero/video/quiz intro. First matching rule wins.
         </p>
 
         {/* Default */}
@@ -136,7 +136,7 @@ export function UtmSwapsForm({
                     <input
                       value={(rule.match as any)[k] || ''}
                       onChange={(e) => updateRuleMatch(rule.id, k, e.target.value)}
-                      placeholder={k === 'utm_source' ? 'google' : k === 'utm_campaign' ? 'whitesands' : ''}
+                      placeholder={k === 'utm_source' ? 'google' : k === 'utm_campaign' ? 'example' : ''}
                       className="w-full h-7 px-2 text-[11px] border border-[var(--ods-border)] rounded-[4px] bg-white focus:outline-none focus:border-[var(--ods-brand-600)]"
                     />
                   </div>

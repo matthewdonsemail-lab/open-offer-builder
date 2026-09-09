@@ -16,7 +16,7 @@ export type ProposalsData = {
 
 const DEFAULT_PROPOSALS: ProposalsData = {
   proposals: [
-    { id: 'p1', title: 'Example Proposal — White Sands Growth Plan', url: 'https://example.com/proposal.pdf', type: 'pdf', description: 'Detailed growth plan for the prospect.' },
+    { id: 'p1', title: 'Example Proposal — Acme Growth Plan', url: 'https://example.com/proposal.pdf', type: 'pdf', description: 'Detailed growth plan for the prospect.' },
   ],
 };
 

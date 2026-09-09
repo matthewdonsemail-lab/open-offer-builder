@@ -49,9 +49,9 @@ const DEFAULT_QUESTIONS: QuizQuestion[] = [
     id: 'market',
     question: 'What market are you looking to dominate?',
     options: [
-      'White Sands / Las Cruces',
-      'Albuquerque / Santa Fe',
-      'El Paso / Surrounding',
+      'Your City / Region',
+      'Nearby Metro Area',
+      'Surrounding Areas',
       'Other market',
     ],
   },

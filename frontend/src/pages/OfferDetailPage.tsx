@@ -282,7 +282,7 @@ export function OfferDetailPage() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., How White Sands Auto Added $10K MRR"
+                  placeholder="e.g., How Acme Added $10K MRR"
                   className="w-full h-10 px-3 text-[13px] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] focus:outline-none focus:border-[var(--ods-brand-600,#2563eb)]"
                 />
               </div>
@@ -334,7 +334,7 @@ export function OfferDetailPage() {
                 <RichEditor
                   value={heroLede}
                   onChange={setHeroLede}
-                  placeholder="Supporting text — use {{area}} for personalization (e.g., PermitOps turns job inputs into permit requirement guidance, fee-estimate signals, and compliance-risk indicators like (like yours) for other contractors in {{area}}.)"
+                  placeholder="Supporting text — use {{area}} for personalization (e.g., Acme turns rough inputs into clear plans and estimates — like (like yours) for other teams in {{area}}.)"
                   showAreaToken={true}
                   minHeight="80px"
                 />

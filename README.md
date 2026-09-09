@@ -302,7 +302,7 @@ bun run dev                  # backend :4000 + frontend :3000, raw interleaved l
 ```
 
 - Frontend: http://localhost:3000 (login with Twenty credentials → `/login` → `/offers`)
-- Preview: http://localhost:3000/preview/general/:id (`?area=Philadelphia` resolves `{{area}}`)
+- Preview: http://localhost:3000/preview/general/:id (`?area=Springfield` resolves `{{area}}`)
 - Health: http://localhost:4000/api/health
 
 Create missing Twenty fields (idempotent) — prefer the seed command, which
