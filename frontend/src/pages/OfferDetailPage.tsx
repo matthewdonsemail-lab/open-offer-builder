@@ -180,6 +180,16 @@ export function OfferDetailPage() {
         } else throw e;
       }
       console.log('[OfferDetail] saved:', res);
+      // Save → preview bridge: notify embedded preview tabs/iframes.
+      // PreviewPage also polls every 20s (covers cross-origin Twenty iframes).
+      const savedId = (res as any)?.id || (!isNew ? id : undefined);
+      if (savedId) {
+        try {
+          localStorage.setItem(`offer:saved:${savedId}`, String(Date.now()));
+          window.parent.postMessage({ type: 'offer:saved', id: savedId }, '*');
+          console.log('[OfferDetail] broadcast offer:saved', savedId);
+        } catch {}
+      }
       navigate('/offers');
     } catch (err: any) {
       console.error('[OfferDetail] Failed to save offer:', err);

@@ -54,7 +54,11 @@ working around it.
 
 ### Preview flow
 
-- Public route `/preview/general/:id` (token forwarded if logged in).
+- Preview route `/preview/:industryId/:id` (alias `/preview/offers/:id`, token
+  forwarded if logged in); public funnel `/offer/:slug?` (mode `public`, no
+  auth — visual payload from `GET /api/public/offers/:slug`, leads to
+  `POST /api/public/leads`, editor chrome hidden). Editor saves broadcast
+  `offer:saved:<id>` (localStorage + postMessage); preview also polls 20s.
 - `{{area}}` resolves **only** from explicit `?area=` — never from a prospect,
   never hardcoded. No area → dashed `{{area}}` token. Use
   `frontend/src/lib/resolveTokens.ts` (single resolver for builder + preview).

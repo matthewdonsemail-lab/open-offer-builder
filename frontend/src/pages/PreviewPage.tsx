@@ -24,7 +24,7 @@ interface OfferData {
   metaPixelId?: string;
 }
 
-export function PreviewPage() {
+export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'public' | 'preview'; slug?: string } = {}) {
   const { id, industryId } = useParams<{ id: string; industryId: string }>();
   const [offer, setOffer] = React.useState<OfferData | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -33,15 +33,20 @@ export function PreviewPage() {
   const [qualification, setQualification] = React.useState<string | null>(null);
   const [leadId, setLeadId] = React.useState<string | null>(null);
   const [meetingBooked, setMeetingBooked] = React.useState(false);
+  const [refreshTick, setRefreshTick] = React.useState(0);
+  // Public funnel has no :id param — fall back to the loaded offer id, then slug.
+  const storageId = id || offer?.id || slug;
 
   React.useEffect(() => {
     async function fetchOffer() {
       try {
-        const token = localStorage.getItem('offer-builder-token');
-        console.log('[PreviewPage] fetching offer', id, 'industry', industryId, 'token present:', !!token);
+        const isPublic = mode === 'public';
+        const url = isPublic ? `/api/public/offers/${slug}` : `/api/offers/${id}`;
+        const token = isPublic ? null : localStorage.getItem('offer-builder-token');
+        console.log('[PreviewPage] fetching offer', isPublic ? slug : id, 'industry', industryId, 'mode:', mode, 'token present:', !!token);
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const response = await fetch(`/api/offers/${id}`, { headers });
+        const response = await fetch(url, { headers });
         console.log('[PreviewPage] response', response.status, response.statusText);
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
@@ -59,17 +64,48 @@ export function PreviewPage() {
       }
     }
     fetchOffer();
-  }, [id, industryId]);
+  }, [id, industryId, mode, slug, refreshTick]);
+
+  // Save → preview bridge (preview mode only): the editor broadcasts
+  // `offer:saved:<id>` on save via localStorage + postMessage; the 20s poll
+  // covers the cross-origin Twenty-iframe case where neither can reach us.
+  React.useEffect(() => {
+    if (mode !== 'preview' || !storageId) return;
+    const refresh = () => {
+      setRefreshTick((t) => t + 1);
+      setQuizKey((k) => k + 1);
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === `offer:saved:${storageId}`) {
+        console.log('[Preview] editor save detected via storage', storageId);
+        refresh();
+      }
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e?.data?.type === 'offer:saved' && (!e.data.id || e.data.id === storageId)) {
+        console.log('[Preview] editor save detected via postMessage', e.data);
+        refresh();
+      }
+    };
+    const poll = window.setInterval(() => setRefreshTick((t) => t + 1), 20000);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('message', onMessage);
+    };
+  }, [mode, storageId]);
 
   React.useEffect(() => {
-    if (!id) return;
-    const key = `quiz_qualification_${id}`;
+    if (!storageId) return;
+    const key = `quiz_qualification_${storageId}`;
     const stored = localStorage.getItem(key) || document.cookie.split('; ').find((c) => c.trim().startsWith(key + '='))?.split('=')[1];
     if (stored) setQualification(stored);
     try {
-      if (localStorage.getItem(`quiz_booking_${id}`)) setMeetingBooked(true);
+      if (localStorage.getItem(`quiz_booking_${storageId}`)) setMeetingBooked(true);
     } catch {}
-  }, [id]);
+  }, [storageId]);
 
   // Once booking completes, scroll to the booked main video.
   React.useEffect(() => {
@@ -89,14 +125,14 @@ export function PreviewPage() {
   // booking, so the booked thank-you + videos can be previewed. Writes the
   // same booking flag the real widget event would write.
   const handleSimulateBooking = () => {
-    if (!id) return;
+    if (!storageId) return;
     try {
-      localStorage.setItem(`quiz_booking_${id}`, JSON.stringify({ at: new Date().toISOString(), uri: null, simulated: true }));
-      document.cookie = `quiz_booking_${id}=1; path=/; max-age=2592000`;
+      localStorage.setItem(`quiz_booking_${storageId}`, JSON.stringify({ at: new Date().toISOString(), uri: null, simulated: true }));
+      document.cookie = `quiz_booking_${storageId}=1; path=/; max-age=2592000`;
     } catch {}
     if (!qualification) handleQualificationChange('QUALIFIED');
     setMeetingBooked(true);
-    console.log('[Preview] simulated calendly booking', id);
+    console.log('[Preview] simulated calendly booking', storageId);
   };
 
   // Inject Meta Pixel base code per offer (PageView) — as per https://developers.facebook.com/docs/meta-pixel/get-started
@@ -137,8 +173,8 @@ export function PreviewPage() {
   }, [offer]);
 
   const handleQualificationChange = (q: string) => {
-    if (!id) return;
-    const key = `quiz_qualification_${id}`;
+    if (!storageId) return;
+    const key = `quiz_qualification_${storageId}`;
     localStorage.setItem(key, q);
     document.cookie = `${key}=${q}; path=/; max-age=604800`;
     setQualification(q);
@@ -151,8 +187,8 @@ export function PreviewPage() {
   };
 
   const handleReset = async () => {
-    if (!id) return;
-    const key = `quiz_qualification_${id}`;
+    if (!storageId) return;
+    const key = `quiz_qualification_${storageId}`;
     if (leadId) {
       try {
         const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
@@ -163,7 +199,7 @@ export function PreviewPage() {
     }
     localStorage.removeItem(key);
     document.cookie = `${key}=; path=/; max-age=0`;
-    const bookingKey = `quiz_booking_${id}`;
+    const bookingKey = `quiz_booking_${storageId}`;
     localStorage.removeItem(bookingKey);
     document.cookie = `${bookingKey}=; path=/; max-age=0`;
     setQualification(null);
@@ -193,9 +229,11 @@ export function PreviewPage() {
         <p className="mt-2 text-base text-neutral-500">
           {error || 'This offer page is not available or has not been configured.'}
         </p>
-        <Link to="/offers" className="inline-flex h-12 items-center px-6 font-medium text-[#1D5BBF] transition-colors hover:text-[#154797]">
-          ← Back to Offers
-        </Link>
+        {mode === 'preview' && (
+          <Link to="/offers" className="inline-flex h-12 items-center px-6 font-medium text-[#1D5BBF] transition-colors hover:text-[#154797]">
+            ← Back to Offers
+          </Link>
+        )}
       </div>
     );
   }
@@ -361,6 +399,7 @@ export function PreviewPage() {
               } catch { return undefined; }
             })()}
             offerId={offer.id}
+            leadsEndpoint={mode === 'public' ? '/api/public/leads' : '/api/leads'}
             prospectId={(offer as any).prospectId || (offer as any).name}
             onQualificationChange={handleQualificationChange}
             onLeadCreated={handleLeadCreated}
@@ -373,11 +412,14 @@ export function PreviewPage() {
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto px-4 pb-8 text-center">
-        <div className="text-[11px] text-[#0D2A4C]/40">Preview • {offer.title || offer.heroH1 || 'Untitled'} • {offer.id}</div>
-      </div>
+      {mode === 'preview' && (
+        <div className="max-w-6xl mx-auto px-4 pb-8 text-center">
+          <div className="text-[11px] text-[#0D2A4C]/40">Preview • {offer.title || offer.heroH1 || 'Untitled'} • {offer.id}</div>
+        </div>
+      )}
 
-      {/* Hovering reset button — only in preview, not in Quiz component */}
+      {/* Hovering reset button — preview only, never on the public funnel */}
+      {mode === 'preview' && (
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-[var(--ods-border,#e5e5ea)] bg-white px-3 h-10 shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
         <span
           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
@@ -410,6 +452,7 @@ export function PreviewPage() {
           Reset quiz
         </button>
       </div>
+      )}
     </div>
   );
 }

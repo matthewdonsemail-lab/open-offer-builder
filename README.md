@@ -122,6 +122,41 @@ flowchart TD
 - **Booked state** persists in `localStorage` (`quiz_booking_${offerId}`) so refreshes never resurrect the form; the hero H1 swaps to the branch's Twenty heading.
 - **Preview reset** (floating button, preview only): deletes the test `agencyLead` from Twenty, clears the qualification/booking flags, and remounts the quiz. **Simulate booking** fires the same booked state without a real Calendly booking.
 
+## Public surface vs internal preview (one backend, two surfaces)
+
+The same Express backend serves the internal builder and the fast public
+funnel — only the frontend route and two unauthenticated endpoints differ:
+
+| Surface | URL | Frontend route | Backend |
+|---------|-----|----------------|---------|
+| Builder (internal) | `domain.com` or `localhost:3000/offers/:id` (+ `/admin/offers/:id` alias) | `OfferDetailPage` | auth `/api/offers/*` |
+| Preview (embedded in Twenty) | `https://offer.domain.com/preview/offers/{{record.id}}` in an iframe | `PreviewPage` (`mode="preview"`) | auth `/api/offers/:id` |
+| Public funnel | `https://offer.domain.com/offer` (or `/offer/:slug`) | `PreviewPage` (`mode="public"`) | **no auth** `/api/public/*` |
+
+DNS/hosting: `domain.com` (marketing, isolated), `offer.domain.com` → CNAME
+to the builder app, `twenty.domain.com` (self-hosted Twenty). The same
+`PreviewPage` renders both preview and public — public mode hides the reset /
+simulate pill, the "Preview •" footer, and the Back-to-Offers link, and
+`Quiz` posts to `/api/public/leads` instead of `/api/leads`.
+
+Save → preview bridge: the editor broadcasts `offer:saved:<id>` via
+`localStorage` + `window.parent.postMessage` on every save; `PreviewPage` in
+preview mode listens for both and also re-fetches every 20s (covers the
+cross-origin Twenty-iframe case where neither signal can reach it).
+
+```bash
+# Visual-only payload (no auth, internal metadata stripped)
+curl https://offer.domain.com/api/public/offers/default
+curl https://offer.domain.com/api/public/offers/<offer-id>
+
+# Lead capture (no auth) → { "success": true, "leadId": "..." }
+curl -X POST https://offer.domain.com/api/public/leads \
+  -H 'Content-Type: application/json' \
+  -d '{"offerId":"<id>","firstName":"Jane","email":"jane@acme.com",
+       "quizAnswers":{"q1":"a1"},"qualificationStatus":"QUALIFIED",
+       "sourceUrl":"https://offer.domain.com/offer","utmSource":"meta"}'
+```
+
 ## Offer Detail editor tabs
 
 `frontend/src/pages/OfferDetailPage.tsx` — top-level tab navigation, each tab edits its own Twenty-backed config:
@@ -358,6 +393,7 @@ through the backend).
 - `POST /api/auth/login`, `GET /api/auth/me`
 - `GET /api/offers`, `GET /api/offers/:id`, `POST /api/offers`, `PATCH /api/offers/:id`, `DELETE /api/offers/:id` (auth required; save retries without `status`/`ctaType` if Twenty lacks the fields)
 - `POST /api/leads` (**public** — funnel submissions), `GET /api/leads`, `DELETE /api/leads/:id` (preview reset)
+- `GET /api/public/offers/:slug` (**public** — visual-only payload; `:slug` is an offer id, slugified title/name, or `default` = first ACTIVE offer), `POST /api/public/leads` (**public** — funnel capture, returns `{ success, leadId }`)
 - `GET /api/prospects` — normalized prospects/leads for the picker
 - `GET /api/health`
 

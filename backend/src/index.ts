@@ -18,6 +18,7 @@ import authRoutes from "./routes/auth.js";
 import offersRoutes from "./routes/offers.js";
 import prospectsRoutes from "./routes/prospects.js";
 import leadsRoutes from "./routes/leads.js";
+import publicRoutes from "./routes/public.js";
 import { getTwentyPgStatus } from "./db/twenty-pg.js";
 import { createLogger } from "./lib/logger.js";
 
@@ -59,6 +60,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/offers", offersRoutes);
 app.use("/api/prospects", prospectsRoutes);
 app.use("/api/leads", leadsRoutes);
+// Unauthenticated public funnel surface (offer.domain.com) — visual payloads + lead capture only
+app.use("/api/public", publicRoutes);
 
 // Log whether Twenty Postgres is available for login
 const twentyPgStatus = getTwentyPgStatus();

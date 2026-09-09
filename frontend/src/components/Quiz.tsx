@@ -32,6 +32,9 @@ type QuizProps = {
   thankYou?: QuizDoneContent | null;
   disqualified?: QuizDoneContent | null;
   fallbackVideos?: QuizDoneVideo[];
+  /** Lead-capture endpoint. Defaults to the internal route; the public
+   *  funnel at offer.domain.com passes '/api/public/leads'. */
+  leadsEndpoint?: string;
 };
 
 const DEFAULT_QUESTIONS: QuizQuestion[] = [
@@ -67,7 +70,7 @@ const DEFAULT_QUESTIONS: QuizQuestion[] = [
   },
 ];
 
-export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, fallbackVideos }: QuizProps) {
+export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, fallbackVideos, leadsEndpoint = '/api/leads' }: QuizProps) {
   const qs = questions && questions.length ? questions : DEFAULT_QUESTIONS;
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -194,17 +197,22 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
     const qualificationStatus = isDisqualified ? 'DISQUALIFIED' : 'QUALIFIED';
     console.log('[Quiz] pushing lead', { offerId, prospectId, answers, contact, qualificationStatus, qs });
     try {
-      const res = await fetch('/api/leads', {
+      const params = new URLSearchParams(window.location.search);
+      const res = await fetch(leadsEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           offerId,
           prospectId,
           answers,
+          quizAnswers: answers,
           contact,
           qualificationStatus,
           quizData: qs,
           source: 'offer-quiz',
+          sourceUrl: window.location.href,
+          utmSource: params.get('utm_source') || undefined,
+          fbclid: params.get('fbclid') || undefined,
         }),
       });
       const data = await res.json();

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -24,10 +24,18 @@ function AuthenticatedApp() {
         <Route path="/offers" element={<OffersPage />} />
         <Route path="/offers/new" element={<OfferDetailPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />
+        {/* Blueprint alias: internal builder surface */}
+        <Route path="/admin/offers/:id" element={<OfferDetailPage />} />
         <Route path="*" element={<Navigate to="/offers" replace />} />
       </Routes>
     </Layout>
   );
+}
+
+/** Public funnel surface (offer.domain.com): no auth, no editor chrome. */
+function PublicOfferRoute() {
+  const { slug } = useParams<{ slug: string }>();
+  return <PreviewPage mode="public" slug={slug || 'default'} />;
 }
 
 export function App() {
@@ -48,9 +56,23 @@ export function App() {
               path="/login" 
               element={<LoginPage onLogin={handleLogin} />} 
             />
-            <Route 
-              path="/preview/:industryId/:id" 
-              element={<PreviewPage />} 
+            <Route
+              path="/preview/:industryId/:id"
+              element={<PreviewPage />}
+            />
+            {/* Blueprint alias: embedded Twenty preview surface */}
+            <Route
+              path="/preview/offers/:id"
+              element={<PreviewPage />}
+            />
+            {/* Blueprint: public funnel surface (offer.domain.com) */}
+            <Route
+              path="/offer"
+              element={<PreviewPage mode="public" slug="default" />}
+            />
+            <Route
+              path="/offer/:slug"
+              element={<PublicOfferRoute />}
             />
             <Route 
               path="/*" 
