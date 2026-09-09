@@ -424,12 +424,71 @@ bun run --cwd backend seed
 
 Build: `bun run --cwd frontend build` (`tsc` is clean — zero errors).
 
+## Deploy to Vercel (single project: static frontend + serverless API)
+
+One Vercel project serves both surfaces — `frontend/dist` as static files,
+`/api/*` rewritten to the Express app bundled as `api/index.ts`
+(`vercel.json`). Same origin, so `VITE_API_URL` stays **unset** in production
+and the browser calls `/api/*` directly.
+
+One-time bootstrap (uses your Vercel credentials via the CLI):
+
+```bash
+npm i -g vercel            # or bunx vercel
+vercel login               # browser login
+vercel link                # link repo → project open-offer-builder (.vercel/ is git-ignored)
+vercel env add TWENTY_BASE_URL production      # https://twenty.inferencesaver.com (/rest optional)
+vercel env add TWENTY_API_KEY production
+vercel env add TWENTY_DATABASE_URL production  # Postgres for login; omit if Twenty PG isn't reachable
+vercel env add JWT_SECRET production
+vercel --prod
+```
+
+Verify after deploy:
+
+```bash
+curl https://<app>.vercel.app/api/health
+curl https://<app>.vercel.app/api/public/offers/default
+```
+
+- Login degrades gracefully: without `TWENTY_DATABASE_URL`, password login is
+  disabled (`twenty-pg.ts` returns `configured: false`) — public funnel routes
+  (`/offer`, `/api/public/*`) are unaffected.
+- `vercel.json` sets `frame-ancestors 'self' https://twenty.inferencesaver.com
+  https://*.vercel.app` so Twenty can iframe the preview; no
+  `X-Frame-Options: DENY` is ever set. If your Twenty host differs, extend the
+  CSP list in `vercel.json`.
+- Local `bun run dev` is unchanged: `tsx watch src/index.ts` binds `:4000`
+  (direct-run only — the `listen` call is skipped when imported by Vercel).
+
+### Twenty iframe embed
+
+In the Twenty `agencyOffers` detail view, add an iframe block:
+
+```
+https://<app>.vercel.app/preview/offers/{{record.id}}
+```
+
+Suggested attrs: `height="900"`, `allow="fullscreen; clipboard-write"`,
+`sandbox="allow-scripts allow-same-origin allow-forms allow-popups"`. The
+preview polls every 20s plus listens for the editor's `offer:saved:<id>`
+broadcast, so cross-origin embeds stay fresh without `postMessage` access.
+
+### Tailscale notes
+
+- **Local iframe test before Vercel:** `tailscale funnel 3000` (or
+  `tailscale serve --bg http://localhost:3000`) gives a public
+  `https://<tail>-funnel.ts.net/preview/offers/:id` URL to paste into Twenty.
+- **If Twenty is tailnet-private:** run a Tailscale subnet router (or Funnel)
+  on the Twenty host and put the tailnet hostname/MagicDNS name in Vercel's
+  `TWENTY_BASE_URL` / `TWENTY_DATABASE_URL` env vars.
+
 ## Environment
 
 `.env.local` (never committed):
 
 ```
-TWENTY_BASE_URL=https://twenty.inferencesaver.com   # no /rest suffix
+TWENTY_BASE_URL=https://twenty.inferencesaver.com   # /rest suffix optional (normalized)
 TWENTY_API_KEY=...
 TWENTY_DATABASE_URL=postgres://...                  # read-only Twenty Postgres for login
 PORT=4000

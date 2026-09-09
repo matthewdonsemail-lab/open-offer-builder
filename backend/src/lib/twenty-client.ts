@@ -55,8 +55,10 @@ export function loadSyncConfig(): SyncConfig {
     );
   }
 
+  // Accept with or without a /rest suffix — callers build `${base}/rest/...`.
+  const normalized = baseUrl.replace(/\/+$/, "").replace(/\/rest$/, "");
   return {
-    twentyBaseUrl: baseUrl.replace(/\/$/, ""),
+    twentyBaseUrl: normalized,
     twentyApiKey: apiKey,
   };
 }
