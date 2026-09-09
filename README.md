@@ -474,15 +474,17 @@ Per-offer dashboards: `https://open-offer-builder.vercel.app/offer/<slug>`
 (`<slug>` = offer id or slugified title; `/offer` alone serves the first
 `ACTIVE` offer).
 
-Click-path in Twenty (works whether you open Twenty via
-`https://twenty.inferencesaver.com` or over Tailscale via node01
-`http://100.98.241.63:3000` — both origins are in the app's
-`frame-ancestors` CSP in `vercel.json`):
+Installed server-side (no clicks needed): **My First Dashboard**
+(`f31ecf3b-…`) now has an **Offer Funnel** tab (position 1) with a full-width
+`IFRAME` widget (`d82a7a4a-…`, 12 cols × 30 rows) pointing at `/offer` —
+inserted directly into `core."pageLayoutTab"` / `core."pageLayoutWidget"`
+over the Tailscale Postgres connection, copying the live `Cold Dialer`
+precedent. Just refresh Twenty to see it.
 
-1. Left nav → **Dashboards** → open **My First Dashboard** (id
-   `f31ecf3b-…` — already in the workspace).
-2. **Edit dashboard → Add widget → Iframe/Embed**, paste the URL above.
-3. Size it full-width, ~900px tall. Save.
+Works whether you open Twenty via `https://twenty.inferencesaver.com` or over
+Tailscale via node01 (`http://100.98.241.63:3000`) — both origins are in the
+app's `frame-ancestors` CSP in `vercel.json`. To add more embeds manually:
+Edit dashboard → Add widget → Iframe/Embed → paste URL → save.
 
 Suggested iframe attrs if your widget lets you set them:
 `allow="fullscreen; clipboard-write"`,
