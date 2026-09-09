@@ -2,6 +2,7 @@
   "name": "open-offer-builder",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Open-source offer-funnel builder on Twenty CRM — visual landing pages, qualifier quizzes, contact capture, Calendly booking, and thank-you/disqualified paths, all stored as structured CRM data.",
   "workspaces": ["backend", "frontend"],
   "scripts": {
