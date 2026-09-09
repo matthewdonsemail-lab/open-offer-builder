@@ -163,8 +163,10 @@ open-offer-builder/
 │   │   └── logger.ts         # timestamped [http]/[auth]/[offers] logs
 │   ├── db/twenty-pg.ts       # read-only Twenty Postgres pool + bcrypt verify
 │   ├── middleware/auth.ts    # JWT middleware (throws without JWT_SECRET in prod)
-│   └── scripts/ensure-*.ts   # idempotent Twenty field bootstrap
-│       (quiz, thankyou, disqualified, calendly, pixel, utm, lead/prospect qual, status/cta)
+│   └── scripts/
+│       ├── seed.ts            # ensure agencyOffers object + all fields (start here)
+│       └── ensure-*.ts        # idempotent single-field bootstrap
+│           (quiz, thankyou, disqualified, calendly, pixel, utm, lead/prospect qual, status/cta)
 ├── frontend/src/
 │   ├── pages/
 │   │   ├── LoginPage.tsx       # TropicalTideBackground + Twenty credential login
@@ -183,6 +185,64 @@ open-offer-builder/
 ```
 
 ## Twenty CRM integration
+
+### Creating objects with Twenty (REST vs Metadata API)
+
+Two different APIs do two different jobs — mixing them up is the most common
+source of `404`/`400` errors in this project:
+
+- **Metadata API** (`POST https://<twenty>/metadata`, GraphQL) — defines
+  **schema**: custom *objects* and *fields*. This is how `agencyOffers` itself
+  (and every custom field on it) comes into existence.
+- **REST API** (`https://<twenty>/rest/...`, `Authorization: Bearer
+  <TWENTY_API_KEY>`) — reads/writes **records** on objects that already exist:
+  `GET /agencyOffers?limit=N`, `POST /agencyOffers`, `PATCH
+  /agencyOffers/:id`, `GET /agencyOffers/:id`, `DELETE /agencyOffers/:id`.
+
+So creating the `agencyOffers` object looks like this (Metadata API):
+
+```graphql
+mutation CreateOneObjectMetadataItem($input: CreateOneObjectInput!) {
+  createOneObject(input: $input) { id nameSingular namePlural }
+}
+```
+
+```json
+{ "input": { "object": {
+  "nameSingular": "agencyOffer",
+  "namePlural": "agencyOffers",
+  "labelSingular": "Agency Offer",
+  "labelPlural": "Agency Offers",
+  "description": "Offer funnels built by open-offer-builder"
+} } }
+```
+
+Custom fields are added the same way (`createOneField` with
+`objectMetadataId` + `name`/`label`/`type`/`description`, plus `options` for
+`SELECT`). Two rules Twenty enforces that have bitten us before:
+
+- `SELECT` option `value`s **must** be UPPER_CASE (`DRAFT`, not `draft`).
+- Field creation needs the object's metadata `id`, so scripts always
+  list-then-find `agencyOffer` first.
+
+### Seed command (idempotent)
+
+`bun run --cwd backend seed` (`backend/src/scripts/seed.ts`) ensures the
+whole thing exists in one go: it creates the `agencyOffers` object **only if
+missing**, then creates each missing custom field (`quizConfig`,
+`thankYouConfig`, `disqualifiedConfig`, `utmSwaps`, `calendlyUrl`,
+`metaPixelId`, `status`, `ctaType`). Anything already present is skipped, so
+re-running is safe:
+
+```
+✓ agencyOffers object already exists (43f10e00-…)
+✓ field quizConfig already exists — skipping
+✓ seed done — agencyOffers ready
+```
+
+Run this first on any fresh Twenty workspace, then create records via
+`POST /rest/agencyOffers` (or the Offer Detail editor, which does the same
+through the backend).
 
 ### agencyOffers fields
 
@@ -233,11 +293,13 @@ bun run dev                  # backend :4000 + frontend :3000, raw interleaved l
 - Preview: http://localhost:3000/preview/general/:id (`?area=Philadelphia` resolves `{{area}}`)
 - Health: http://localhost:4000/api/health
 
-Create missing Twenty fields (idempotent):
+Create missing Twenty fields (idempotent) — prefer the seed command, which
+covers the object plus every field in one run:
 
 ```bash
-bun run --cwd backend src/scripts/ensure-quiz-field.ts
-# …ensure-thankyou-field, ensure-disqualified-field, ensure-calendly-field,
+bun run --cwd backend seed
+# …or individual scripts: src/scripts/ensure-quiz-field.ts,
+#   ensure-thankyou-field, ensure-disqualified-field, ensure-calendly-field,
 #   ensure-pixel-field, ensure-utm-field, ensure-lead-field,
 #   ensure-prospect-qual, ensure-status-cta-fields
 ```
