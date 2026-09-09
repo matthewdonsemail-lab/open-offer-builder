@@ -1,218 +1,179 @@
 # Open Offer Builder
 
-基于 Twenty CRM 的开放式优惠管理工具，提供优惠创建、管理和预览功能。
+Offer-funnel builder backed by Twenty CRM. Each offer is a full funnel — landing hero + video + qualifier quiz → contact capture → Calendly booking → booked thank-you with videos — with a disqualified path for poor-fit prospects. Everything is authored in the Offer Detail editor and stored on the `agencyOffers` object in Twenty.
 
-## 项目概述
+## How the funnel works
 
-这是一个开源项目，基于 [open-twenty-dialer](https://github.com/...) 的架构模式，专注于优惠（Offer）的管理和展示。
+```
+Landing (hero H1/lede + video + Quiz)
+  → Quiz questions (DQ flags route to disqualified)
+  → Contact form (name / email / phone)
+  → POST /api/leads → agencyLead tagged QUALIFIED or DISQUALIFIED
+  → Calendly embed (qualified vs disqualified embed per branch)
+  → calendly.event_scheduled → BOOKED
+      → hero H1 swaps to thank-you message
+      → quiz + hero video unmount, thank-you videos render (1 main + 2×2 grid)
+      → state persists in localStorage so the form can't be redone
+```
 
-### 核心特性
+- **Qualified path** uses `thankYouConfig` + `calendlyUrl`.
+- **Disqualified path** (any answer with the DQ flag checked) uses `disqualifiedConfig` + its own Calendly embed. The lead is still captured, tagged `DISQUALIFIED`.
+- **Preview reset** (floating button, preview only): deletes the test `agencyLead` from Twenty, clears the qualification/booking flags, and remounts the quiz. **Simulate booking** fires the same booked state without a real Calendly booking.
 
-- 与 Twenty CRM 集成，使用 `agencyOffers` 对象存储数据
-- 现代化的 Twenty CRM 风格 UI
-- 支持优惠的创建、编辑、删除和预览
-- 响应式设计，支持移动端
-- 简化的认证系统
+## Offer Detail editor tabs
 
-## 技术栈
+`frontend/src/pages/OfferDetailPage.tsx` — top-level tab navigation, each tab edits its own Twenty-backed config:
 
-### 后端
-- Node.js + Express
-- TypeScript
-- Twenty CRM REST API
-- JWT 认证
+| Tab | Component | Stored as |
+|-----|-----------|-----------|
+| Landing page | Basic Info + Hero Section + Video URL + `QualifierQuiz` | `title/name/heroH1/heroLede/videoUrl/quizConfig` |
+| Thank-you | `ThankYouEditor` (badge, heading, video, video grid) | `thankYouConfig` (RAW_JSON) |
+| Disqualified | `DisqualifiedForm` (same blocks + disqualified Calendly) | `disqualifiedConfig` (RAW_JSON) |
+| Settings | `SettingsForm` (Meta Pixel ID, status, CTA type) | `metaPixelId` (TEXT), `status`, `ctaType` |
+| UTM swaps | `UtmSwapsForm` (per-UTM text overrides) | `utmSwaps` (RAW_JSON) |
+| Proposals | static placeholder | `ProposalsForm.tsx` exists but is not wired into the tab yet |
 
-### 前端
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS
-- TanStack Query
-- @floating-ui/react
+## Quiz system
 
-## 目录结构
+- `QualifierQuiz.tsx` — the **editor**: intro headline/description, reusable question blocks (text, type selector, delete), option rows (text, **DQ** toggle, **FB lead-event** toggle, next-question routing, delete), add question/option, contact-info + on-qualified settings. DQ/FB controls have hover tooltips explaining exactly what they do.
+- `Quiz.tsx` — the **runtime**: `framer-motion` transitions, progress bar, immediate hover scale, supports `questions` prop (string or `{text, dq, fbLead}` objects).
+- Any option with `dq: true` flips the session to disqualified (sticky). Options with `fbLead: true` fire `fbq('track', 'Lead', {content_name, content_category})` when Meta Pixel is configured.
+- `nextQuestion` routing is authored but the runtime still advances linearly.
+
+## Tokens & personalization
+
+`frontend/src/lib/resolveTokens.ts` is the single resolver for `{{area}}` / `{{city}}`:
+
+- `RichEditor.tsx` (hero H1/lede editing) stores HTML verbatim; the lede toolbar has a `{{area}}` insert button, the H1 toolbar does not.
+- Preview resolves tokens **only** from an explicit `?area=` param — never from a prospect record, never hardcoded. With no area, the token renders as a dashed `{{area}}` placeholder (template mode); type a real city for tailored mode.
+- Bare `(like yours)` renders as a yellow `<mark>`; content already inside `<mark>` is left alone.
+
+## Tracking
+
+- Per-offer `metaPixelId` (Settings tab → Twenty `TEXT` field). Preview injects the Meta Pixel base code (`fbq('init')` + `PageView`); quiz answers flagged FB-lead fire `Lead` events.
+- Test an event from Settings with **Test Lead event →** (logs to console when `fbq` is present).
+
+## Tech stack
+
+- **Backend:** Node.js + Express + TypeScript, Twenty REST + Metadata APIs, Postgres (`core."user"`) password verification, JWT auth.
+- **Frontend:** React 18 + TypeScript + Vite, Tailwind CSS, TanStack Query, `@floating-ui/react` (all dropdowns/tooltips — no native `<select>`), `framer-motion`, Satoshi font, `--ods-*` design tokens.
+
+## Directory structure
 
 ```
 open-offer-builder/
-├── backend/                    # 后端服务
-│   ├── src/
-│   │   ├── routes/
-│   │   │   ├── auth.ts        # 认证路由
-│   │   │   └── offers.ts      # 优惠 CRUD 路由
-│   │   ├── lib/
-│   │   │   ├── twenty-client.ts  # Twenty CRM API 封装
-│   │   │   └── logger.ts       # 日志工具
-│   │   ├── middleware/
-│   │   │   └── auth.ts         # JWT 认证中间件
-│   │   ├── db/
-│   │   │   └── twenty-pg.ts    # Twenty Postgres 连接
-│   │   └── index.ts            # 入口文件
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/                   # 前端应用
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── LoginPage.tsx       # 登录页
-│   │   │   ├── OffersPage.tsx      # 优惠列表页
-│   │   │   ├── OfferDetailPage.tsx # 优惠详情页（表单构建器）
-│   │   │   └── PreviewPage.tsx     # 公开预览页
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   └── Layout.tsx      # 布局组件
-│   │   │   └── ui/
-│   │   │       ├── WidgetCard.tsx  # 卡片组件
-│   │   │       ├── Badge.tsx       # 徽章组件
-│   │   │       ├── Toast.tsx       # 通知组件
-│   │   │       └── Spinner.tsx     # 加载动画
-│   │   ├── lib/
-│   │   │   └── api.ts              # API 客户端
-│   │   ├── App.tsx                 # 主应用组件
-│   │   ├── main.tsx                # 入口文件
-│   │   └── index.css               # 全局样式
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-├── package.json                  # 根 workspace
-└── .env.example                  # 环境变量模板
+├── backend/src/
+│   ├── routes/
+│   │   ├── auth.ts        # login via Twenty Postgres, JWT issue
+│   │   ├── offers.ts      # agencyOffers CRUD (POST/PATCH whitelist)
+│   │   ├── leads.ts       # POST /api/leads (public funnel), DELETE /:id (preview reset)
+│   │   └── prospects.ts   # normalized prospect/lead list (city/region included)
+│   ├── lib/
+│   │   ├── twenty-client.ts  # Twenty REST wrapper
+│   │   └── logger.ts         # timestamped [http]/[auth]/[offers] logs
+│   ├── db/twenty-pg.ts       # read-only Twenty Postgres pool + bcrypt verify
+│   ├── middleware/auth.ts    # JWT middleware (throws without JWT_SECRET in prod)
+│   └── scripts/ensure-*.ts   # idempotent Twenty field bootstrap
+│       (quiz, thankyou, disqualified, calendly, pixel, utm, lead/prospect qual, status/cta)
+├── frontend/src/
+│   ├── pages/
+│   │   ├── LoginPage.tsx       # TropicalTideBackground + Twenty credential login
+│   │   ├── OffersPage.tsx      # offers table (status/CTA inline selects, delete modal)
+│   │   ├── OfferDetailPage.tsx # 6-tab editor + save with retry
+│   │   └── PreviewPage.tsx     # public funnel (/preview/:industryId/:id)
+│   ├── components/
+│   │   ├── Quiz.tsx / QualifierQuiz.tsx
+│   │   ├── ThankYouEditor.tsx / DisqualifiedForm.tsx
+│   │   ├── SettingsForm.tsx / UtmSwapsForm.tsx / ProposalsForm.tsx
+│   │   ├── ProspectSelect.tsx / StatusSelect.tsx / RichEditor.tsx
+│   │   └── ui/ (Modal, Button, Badge, Toast, Spinner/Spokes, WidgetCard)
+│   └── lib/
+│       ├── api.ts / resolveTokens.ts / twentyOptions.ts / utils.ts
+└── package.json  # bun workspaces (backend + frontend)
 ```
 
-## Twenty CRM 集成
+## Twenty CRM integration
 
-### agencyOffers 对象结构
+### agencyOffers fields
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | UUID | 唯一标识符 |
-| title | TEXT | 优惠标题 |
-| name | TEXT | 内部名称 |
-| heroH1 | TEXT | 英雄区主标题 |
-| heroLede | RICH_TEXT | 英雄区描述（Markdown） |
-| videoUrl | LINKS | 视频链接配置 |
-| createdAt | DATE_TIME | 创建时间 |
-| updatedAt | DATE_TIME | 更新时间 |
+| Field | Type | Notes |
+|-------|------|-------|
+| title / name | TEXT | `name` doubles as `prospectId` lookup (`filter=name[eq]:id`) |
+| heroH1 | TEXT | raw HTML from RichEditor, rendered verbatim |
+| heroLede | RICH_TEXT | `{markdown, blocknote}` — markdown holds HTML + `{{area}}` |
+| videoUrl | LINKS | `{primaryLinkLabel, primaryLinkUrl, secondaryLinks[]}` |
+| status | SELECT | `DRAFT`/`ACTIVE`/`PAUSED` (UPPER_CASE required) |
+| ctaType | SELECT | `CONSULTATION`/`PRICING`/`CUSTOM` (UPPER_CASE required; currently stored only — the funnel always ends in booking) |
+| quizConfig | RAW_JSON | `QuizQuestion[]` with `dq`/`fbLead`/`nextQuestion` per option |
+| thankYouConfig | RAW_JSON | badge, heading, `video` URL, video grid |
+| disqualifiedConfig | RAW_JSON | same + `calendlyEmbed` (full inline widget HTML) |
+| calendlyUrl | TEXT | qualified Calendly embed HTML (or bare URL) |
+| metaPixelId | TEXT | per-offer Meta Pixel ID, empty = disabled |
+| utmSwaps | RAW_JSON | `{default, rules[]}` per-UTM text overrides |
 
-### API 端点
+`status`/`ctaType` option values **must** be UPPER_CASE (Twenty validates). The UI keeps pretty labels and uppercases on write.
 
-#### 认证
-- `POST /api/auth/login` - 用户登录
-- `GET /api/auth/me` - 获取当前用户信息
+### agencyLeads fields (funnel-created)
 
-#### 优惠管理（需要认证）
-- `GET /api/offers` - 获取所有优惠
-- `GET /api/offers/:id` - 获取单个优惠
-- `POST /api/offers` - 创建优惠
-- `PATCH /api/offers/:id` - 更新优惠
-- `DELETE /api/offers/:id` - 删除优惠
+| Field | Type | Notes |
+|-------|------|-------|
+| qualificationStatus | SELECT | `QUALIFIED` (green) / `DISQUALIFIED` (red) |
+| status | SELECT | mirrors qualification (`QUALIFIED` → `QUALIFIED`, `DISQUALIFIED` → `LOST`) |
+| note | TEXT | contact details + quiz answers JSON (EMAILS type is finicky, so contact lives in `note`) |
 
-#### 公开预览
-- `GET /preview/:industryId/:id` - 预览优惠页面（无需认证）
+### Backend API
 
-## 快速开始
+- `POST /api/auth/login`, `GET /api/auth/me`
+- `GET /api/offers`, `GET /api/offers/:id`, `POST /api/offers`, `PATCH /api/offers/:id`, `DELETE /api/offers/:id` (auth required; save retries without `status`/`ctaType` if Twenty lacks the fields)
+- `POST /api/leads` (**public** — funnel submissions), `GET /api/leads`, `DELETE /api/leads/:id` (preview reset)
+- `GET /api/prospects` — normalized prospects/leads for the picker
+- `GET /api/health`
 
-### 环境要求
+## Quick start
 
-- Node.js >= 18
-- npm >= 9
-- Twenty CRM 实例（用于存储优惠数据）
+Requirements: Node.js ≥ 18, bun, a Twenty CRM instance.
 
-### 安装
-
-1. 克隆项目
 ```bash
-git clone <repository-url>
-cd open-offer-builder
+cp .env.example .env.local   # fill in TWENTY_BASE_URL, TWENTY_API_KEY, TWENTY_DATABASE_URL, JWT_SECRET
+bun install
+bun run dev                  # backend :4000 + frontend :3000, raw interleaved logs
 ```
 
-2. 安装依赖
+- Frontend: http://localhost:3000 (login with Twenty credentials → `/login` → `/offers`)
+- Preview: http://localhost:3000/preview/general/:id (`?area=Philadelphia` resolves `{{area}}`)
+- Health: http://localhost:4000/api/health
+
+Create missing Twenty fields (idempotent):
+
 ```bash
-npm install
-cd backend && npm install && cd ..
-cd frontend && npm install && cd ..
+bun run --cwd backend src/scripts/ensure-quiz-field.ts
+# …ensure-thankyou-field, ensure-disqualified-field, ensure-calendly-field,
+#   ensure-pixel-field, ensure-utm-field, ensure-lead-field,
+#   ensure-prospect-qual, ensure-status-cta-fields
 ```
 
-3. 配置环境变量
-```bash
-cp .env.example .env.local
-# 编辑 .env.local，填入你的 Twenty CRM API 密钥
+Build: `bun run --cwd frontend build` (`tsc` is clean — zero errors).
+
+## Environment
+
+`.env.local` (never committed):
+
+```
+TWENTY_BASE_URL=https://twenty.inferencesaver.com   # no /rest suffix
+TWENTY_API_KEY=...
+TWENTY_DATABASE_URL=postgres://...                  # read-only Twenty Postgres for login
+PORT=4000
+JWT_SECRET=...                                      # required in prod — no fallback
+VITE_API_URL=http://localhost:4000
 ```
 
-4. 启动开发服务器
-```bash
-# 启动后端
-cd backend
-npm run dev
+## Conventions
 
-# 启动前端（另一个终端）
-cd frontend
-npm run dev
-```
+- No native `<select>` — all dropdowns use `@floating-ui/react` + `FloatingPortal` (see `StatusSelect`, `ProspectSelect`, `QualifierQuiz` selects).
+- No backend internals in prospect-facing copy (no QUALIFIED/DISQUALIFIED badges, no `agencyLead`/Twenty mentions in `Quiz`).
+- Loading states always use the `Spokes` spinner, never "Loading..." text.
+- `console.log('[OfferDetail] …')` / `[Quiz] …` / `[Preview] …` JSON logs in dev; `[http]` request logs on the backend.
 
-5. 访问应用
-- 前端：http://localhost:3000
-- 后端：http://localhost:4000
-- API 健康检查：http://localhost:4000/api/health
+## License
 
-## 构建生产版本
-
-### 后端
-```bash
-cd backend
-npm run build
-npm start
-```
-
-### 前端
-```bash
-cd frontend
-npm run build
-# 构建产物在 dist/ 目录
-```
-
-## 设计系统
-
-本项目遵循 Twenty CRM 的设计规范：
-
-- **颜色变量**: 使用 `--ods-*` CSS 自定义属性
-- **间距**: 基于 4px 网格系统
-- **圆角**: 4px（按钮/输入框），6px（卡片/下拉菜单）
-- **字体**: 系统字体栈，11-13px 为标准字号
-
-详见 [DESIGN_SYSTEM.md](../DESIGN_SYSTEM.md)
-
-## 对比 open-twenty-dialer
-
-| 特性 | open-twenty-dialer | open-offer-builder |
-|------|-------------------|-------------------|
-| 核心对象 | agencyProspects, agencyLeads, agencyCampaigns | agencyOffers |
-| 主要功能 | 冷呼叫管理 | 优惠创建和展示 |
-| 电话功能 | ✅ | ❌ |
-| 呼叫记录 | ✅ | ❌ |
-| 脚本管理 | ✅ | ❌ |
-| 公开预览 | ❌ | ✅ |
-| UI 风格 | Twenty CRM 风格 | Twenty CRM 风格 |
-
-## 扩展开发
-
-### 添加新的优惠字段
-
-1. 在 Twenty CRM 中创建新字段（使用 Metadata API）
-2. 更新 [backend/src/routes/offers.ts](backend/src/routes/offers.ts) 中的处理逻辑
-3. 更新 [frontend/src/lib/api.ts](frontend/src/lib/api.ts) 中的类型定义
-4. 在 [frontend/src/pages/OfferDetailPage.tsx](frontend/src/pages/OfferDetailPage.tsx) 中添加表单字段
-
-### 自定义预览样式
-
-编辑 [frontend/src/pages/PreviewPage.tsx](frontend/src/pages/PreviewPage.tsx) 中的渲染逻辑。
-
-## 许可证
-
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
----
-
-基于 [open-twenty-dialer](https://github.com/...) 架构开发
+MIT
