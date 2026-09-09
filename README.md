@@ -2,22 +2,112 @@
 
 Offer-funnel builder backed by Twenty CRM. Each offer is a full funnel — landing hero + video + qualifier quiz → contact capture → Calendly booking → booked thank-you with videos — with a disqualified path for poor-fit prospects. Everything is authored in the Offer Detail editor and stored on the `agencyOffers` object in Twenty.
 
+## Architecture
+
+Three processes talk to each other. The browser only ever talks to the
+frontend; the frontend talks to the backend over `/api/*`; the backend is the
+only thing that touches Twenty (REST for records, Metadata API for schema,
+Postgres for login verification).
+
+```mermaid
+flowchart LR
+    Browser["Browser"]
+    FE["Frontend<br/>Vite + React :3000"]
+    BE["Backend<br/>Express + TS :4000"]
+    REST["Twenty REST API<br/>records"]
+    META["Twenty Metadata API<br/>schema"]
+    PG[("Twenty Postgres<br/>core.user")]
+
+    Browser --> FE
+    FE -->|"GET/POST/PATCH /api/*<br/>JWT bearer"| BE
+    FE -->|"POST /api/leads<br/>public, no auth"| BE
+    BE --> REST
+    BE --> META
+    BE -->|"bcrypt password check"| PG
+```
+
+How it works, end to end:
+
+- **Authoring:** the Offer Detail editor (`OfferDetailPage.tsx`) holds one tab
+  per concern (landing, thank-you, disqualified, settings, UTM, proposals).
+  Saving whitelists fields and `POST`/`PATCH`es a single `agencyOffers`
+  record — configs travel as `RAW_JSON`, embeds/links as `TEXT`/`LINKS`.
+- **Serving:** the public preview (`PreviewPage.tsx`) fetches that one record
+  and renders hero, video, and quiz from it. No CMS, no build step — editing
+  the offer changes the funnel immediately.
+- **Capture:** quiz answers + contact form `POST /api/leads` (the one public
+  route), creating an `agencyLead` tagged `QUALIFIED`/`DISQUALIFIED`.
+- **Booking:** the Calendly widget lives inside `Quiz.tsx`; its
+  `event_scheduled` message flips the funnel into the booked state.
+
+Auth follows the same split — the browser never sees Postgres:
+
+```mermaid
+flowchart TD
+    Login["LoginPage<br/>email + password"]
+    Verify["twenty-pg.ts<br/>SELECT core.user + bcrypt.compare"]
+    PG[("Twenty Postgres")]
+    JWT["JWT signed, 7 day expiry"]
+    Guard["authMiddleware<br/>all /api/* except POST /api/leads"]
+    Denied["401 Invalid credentials"]
+
+    Login --> Verify
+    Verify --> PG
+    PG --> Verify
+    Verify -- "match" --> JWT
+    Verify -- "no match" --> Denied
+    JWT --> Guard
+```
+
+Saving is defensive: Twenty rejects unknown fields with a 400, so the editor
+tries the full payload first and retries without the not-yet-provisioned
+fields (`status`/`ctaType`) rather than failing the whole save:
+
+```mermaid
+flowchart TD
+    Editor["Editor tabs → buildData()<br/>whitelisted fields only"]
+    TryFull["POST/PATCH with status + ctaType"]
+    Missing{"400 unknown field?"}
+    Retry["Retry without status/ctaType"]
+    Ok["200 → toast + navigate to /offers"]
+    Err["Save-failed banner"]
+
+    Editor --> TryFull
+    TryFull --> Missing
+    Missing -- "No" --> Ok
+    Missing -- "Yes" --> Retry
+    Retry --> Ok
+    Retry -- "Still failing" --> Err
+```
+
 ## How the funnel works
 
-```
-Landing (hero H1/lede + video + Quiz)
-  → Quiz questions (DQ flags route to disqualified)
-  → Contact form (name / email / phone)
-  → POST /api/leads → agencyLead tagged QUALIFIED or DISQUALIFIED
-  → Calendly embed (qualified vs disqualified embed per branch)
-  → calendly.event_scheduled → BOOKED
-      → hero H1 swaps to thank-you message
-      → quiz + hero video unmount, thank-you videos render (1 main + 2×2 grid)
-      → state persists in localStorage so the form can't be redone
+```mermaid
+flowchart TD
+    Landing["Landing<br/>hero + video + Quiz"]
+    Questions["Quiz questions"]
+    Contact["Contact form<br/>name / email / phone"]
+    CreateLead["POST /api/leads"]
+    Qual{"dq flag hit?"}
+    EmbedQ["Qualified Calendly embed<br/>calendlyUrl"]
+    EmbedD["Disqualified Calendly embed<br/>disqualifiedConfig.calendlyEmbed"]
+    Wait["Wait for calendly.event_scheduled"]
+    Booked["BOOKED<br/>H1 swapped to thank-you message<br/>quiz + hero video unmounted<br/>videos: 1 main + 2x2 grid"]
+
+    Landing --> Questions
+    Questions --> Contact
+    Contact --> CreateLead
+    CreateLead --> Qual
+    Qual -- "No → QUALIFIED" --> EmbedQ
+    Qual -- "Yes → DISQUALIFIED" --> EmbedD
+    EmbedQ --> Wait
+    EmbedD --> Wait
+    Wait --> Booked
 ```
 
 - **Qualified path** uses `thankYouConfig` + `calendlyUrl`.
-- **Disqualified path** (any answer with the DQ flag checked) uses `disqualifiedConfig` + its own Calendly embed. The lead is still captured, tagged `DISQUALIFIED`.
+- **Disqualified path** (any answer with the DQ flag checked — sticky for the session) uses `disqualifiedConfig` + its own Calendly embed. The lead is still captured, tagged `DISQUALIFIED`.
+- **Booked state** persists in `localStorage` (`quiz_booking_${offerId}`) so refreshes never resurrect the form; the hero H1 swaps to the branch's Twenty heading.
 - **Preview reset** (floating button, preview only): deletes the test `agencyLead` from Twenty, clears the qualification/booking flags, and remounts the quiz. **Simulate booking** fires the same booked state without a real Calendly booking.
 
 ## Offer Detail editor tabs
