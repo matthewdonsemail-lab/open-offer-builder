@@ -461,18 +461,41 @@ curl https://<app>.vercel.app/api/public/offers/default
 - Local `bun run dev` is unchanged: `tsx watch src/index.ts` binds `:4000`
   (direct-run only — the `listen` call is skipped when imported by Vercel).
 
-### Twenty iframe embed
+### Twenty dashboard embed (iframe)
 
-In the Twenty `agencyOffers` detail view, add an iframe block:
+The public funnel is chromeless and auth-free, so it drops straight into a
+Twenty dashboard as an iframe widget — no login, no editor chrome:
 
 ```
-https://<app>.vercel.app/preview/offers/{{record.id}}
+https://open-offer-builder.vercel.app/offer
 ```
 
-Suggested attrs: `height="900"`, `allow="fullscreen; clipboard-write"`,
-`sandbox="allow-scripts allow-same-origin allow-forms allow-popups"`. The
-preview polls every 20s plus listens for the editor's `offer:saved:<id>`
-broadcast, so cross-origin embeds stay fresh without `postMessage` access.
+Per-offer dashboards: `https://open-offer-builder.vercel.app/offer/<slug>`
+(`<slug>` = offer id or slugified title; `/offer` alone serves the first
+`ACTIVE` offer).
+
+Click-path in Twenty (works whether you open Twenty via
+`https://twenty.inferencesaver.com` or over Tailscale via node01
+`http://100.98.241.63:3000` — both origins are in the app's
+`frame-ancestors` CSP in `vercel.json`):
+
+1. Left nav → **Dashboards** → open **My First Dashboard** (id
+   `f31ecf3b-…` — already in the workspace).
+2. **Edit dashboard → Add widget → Iframe/Embed**, paste the URL above.
+3. Size it full-width, ~900px tall. Save.
+
+Suggested iframe attrs if your widget lets you set them:
+`allow="fullscreen; clipboard-write"`,
+`sandbox="allow-scripts allow-same-origin allow-forms allow-popups"`.
+
+Notes:
+
+- Use `/offer...`, **not** `/preview/offers/:id`, for dashboards — preview
+  mode needs a logged-in builder token, the public funnel doesn't.
+- The funnel carries `sourceUrl`/`utmSource`/`fbclid` into the lead's note on
+  every `POST /api/public/leads`, so dashboard-sourced leads stay attributed.
+- The editor's save → preview bridge (localStorage + postMessage + 20s poll)
+  keeps embedded views fresh after each save.
 
 ### Tailscale notes
 
