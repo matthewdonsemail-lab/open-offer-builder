@@ -142,13 +142,83 @@ flowchart TD
 - Any option with `dq: true` flips the session to disqualified (sticky). Options with `fbLead: true` fire `fbq('track', 'Lead', {content_name, content_category})` when Meta Pixel is configured.
 - `nextQuestion` routing is authored but the runtime still advances linearly.
 
-## Tokens & personalization
+## Colouring, formatting & tokens
 
-`frontend/src/lib/resolveTokens.ts` is the single resolver for `{{area}}` / `{{city}}`:
+Hero copy is authored as raw HTML and rendered verbatim. There is no theme
+layer in between — what `RichEditor` saves is what the preview injects.
 
-- `RichEditor.tsx` (hero H1/lede editing) stores HTML verbatim; the lede toolbar has a `{{area}}` insert button, the H1 toolbar does not.
-- Preview resolves tokens **only** from an explicit `?area=` param — never from a prospect record, never hardcoded. With no area, the token renders as a dashed `{{area}}` placeholder (template mode); type a real city for tailored mode.
-- Bare `(like yours)` renders as a yellow `<mark>`; content already inside `<mark>` is left alone.
+### 1. Authoring — `RichEditor.tsx` toolbar
+
+Select text, click a style. Each button wraps the selection (`wrapSelection`,
+`RichEditor.tsx:11`) and the resulting HTML is stored as-is:
+
+| Button | Title attr | Emitted HTML |
+|--------|-----------|--------------|
+| **B** | `Bold` | `<strong>…</strong>` |
+| **A●** (blue) | `Blue color` | `<span style="color:#2563eb">…</span>` |
+| **A●** (dark) | `Dark color` | `<span style="color:#0D2A4C">…</span>` |
+| **H** (yellow) | `Highlight (yellow)` | `<mark class="bg-[#FFEB3B] rounded px-0.5">…</mark>` |
+| **U** (underlined) | `Underline (for Your Area)` | `<span style="text-decoration:underline; text-decoration-color:#1D5BBF; text-underline-offset:4px; font-weight:700">…</span>` |
+| **+ {{area}}** (lede toolbar only) | — | inserts the literal token `{{area}}` at the cursor |
+
+Notes: buttons use `onMouseDown={e => e.preventDefault()}` so the text
+selection survives the click (`RichEditor.tsx:77`); the H1 toolbar has no
+`{{area}}` button by design (`showAreaToken={false}`); the editor is a
+`contentEditable` div syncing `innerHTML` on input/blur (`RichEditor.tsx:54`).
+
+### 2. Storage — verbatim HTML in Twenty
+
+- `heroH1` (`TEXT`) and `heroLede.markdown` (`RICH_TEXT`) hold the editor's
+  `innerHTML` unchanged, including tokens (`OfferDetailPage` save payload).
+- Styling is **inline `style="…"`**, not classes: Twenty stores raw HTML with
+  no access to the app's Tailwind build, so classes would not resolve. The
+  one exception is the highlight `<mark class="bg-[#FFEB3B] rounded px-0.5">`,
+  which the editor emits but the resolver normalises to inline styles —
+  never author `class=` by hand.
+
+### 3. Rendering — `resolveTokens.ts` + `dangerouslySetInnerHTML`
+
+Both `PreviewPage.tsx:233,250` and the builder live preview inject the
+resolved HTML unescaped. `resolveAreaTokens(html, { area, keepTokenIfMissing })`
+runs three passes in this order (order matters — see gotchas):
+
+1. **Wrapped tokens first**: `{{area}}` already inside an underline `<span>`
+   has its inner text replaced; existing `style`/`data-token` attrs are
+   stripped and a single clean style applied.
+2. **Bare tokens in text nodes only**: HTML is split into tags vs text
+   (`out.split(/(<[^>]*>)/)`), so replacements never touch attributes.
+   `{{area}}`/`{{city}}` (case-insensitive) → solid underline span with the
+   area, or — with no area — a dashed-underline `{{area}}` placeholder
+   (`data-token="area"`, no braces, so it can never re-match). `{{name}}`
+   is left untouched.
+3. **Bare `(like yours)`** → yellow
+   `<mark style="background:#FFEB3B; border-radius:2px; padding:0 2px">`,
+   skipping text already inside a `<mark>` (depth-tracked).
+
+Token source priority: explicit `?area=` URL param → resolved area → dashed
+token placeholder. Tokens are **never** pulled from a prospect record and
+never hardcoded to "Your Area".
+
+### Worked example
+
+Stored in Twenty (`heroLede.markdown`):
+
+```html
+PermitOps turns job inputs into <mark style="background:#FFEB3B; border-radius:2px; padding:0 2px">(like yours)</mark> for other contractors in {{area}}.
+```
+
+Preview with `?area=Philadelphia` renders: yellow-highlighted "(like yours)"
+plus solid-underlined "Philadelphia". With no `?area=`, the same string
+renders the highlight plus a dashed `{{area}}` token (template mode).
+
+### Gotchas (fixed, documented so they stay fixed)
+
+- **Nested spans**: the bare-token pass must run *after* the wrapped-token
+  pass, otherwise `{{area}}` inside an existing underline span gets wrapped
+  a second time (`<span><span>`).
+- **Leaked `style="…"` as visible text**: caused by matching `{{area}}`
+  inside `data-token="{{area}}"` attributes. Fixed by tag/text splitting
+  and brace-free `data-token="area"`.
 
 ## Tracking
 
