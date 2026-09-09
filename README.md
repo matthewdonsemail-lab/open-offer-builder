@@ -477,7 +477,9 @@ Per-offer dashboards: `https://open-offer-builder.vercel.app/offer/<slug>`
 Installed server-side (no clicks needed): a dedicated **Offer Funnel
 Dashboard** (`8583356f-…`, position 2) with layout `899b4100-…`, tab
 `33a28165-…`, and a full-width `IFRAME` widget (`0071f935-…`, 12 cols ×
-30 rows) pointing at `/offer` — inserted directly into `core."pageLayout"`
+30 rows) pointing at `/dashboard?embed=1` (login → stat cards + offers
+table, Layout chrome stripped in embed mode) — inserted
+directly into `core."pageLayout"`
 / `"pageLayoutTab"` / `"pageLayoutWidget"` plus the workspace `dashboard`
 record over the Tailscale Postgres connection, following the live `Cold
 Dialer` conventions exactly (`Custom` application, `universalIdentifier` =
