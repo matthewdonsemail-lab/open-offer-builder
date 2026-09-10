@@ -25,7 +25,7 @@ interface OfferData {
 }
 
 export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'public' | 'preview'; slug?: string } = {}) {
-  const { id, industryId } = useParams<{ id: string; industryId: string }>();
+  const { id, industryId, prospectKey: prospectRouteKey } = useParams<{ id: string; industryId: string; prospectKey: string }>();
   const [offer, setOffer] = React.useState<OfferData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -37,7 +37,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
   // Public funnel has no :id param — fall back to the loaded offer id, then slug.
   const storageId = id || offer?.id || slug;
 
-  const prospectKey = (() => {
+  const prospectKey = prospectRouteKey || (() => {
     try {
       return new URLSearchParams(window.location.search).get('prospect') || '';
     } catch {
@@ -58,7 +58,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
       try {
         const isPublic = mode === 'public';
         const offerPath = isPublic && prospectKey
-          ? `/api/public/offers/${slug}?prospect=${encodeURIComponent(prospectKey)}`
+          ? `/api/public/offers/by-prospect/${encodeURIComponent(prospectKey)}`
           : isPublic
             ? `/api/public/offers/${slug}`
             : `/api/offers/${id}`;

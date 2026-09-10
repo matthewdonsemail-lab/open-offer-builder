@@ -40,6 +40,12 @@ function PublicOfferRoute() {
   return <PreviewPage mode="public" slug={slug || 'default'} />;
 }
 
+/** Industry pages: serves the offer linked to the prospect, or 404s. */
+function PublicProspectRoute() {
+  const { prospectKey } = useParams<{ prospectKey: string }>();
+  return <PreviewPage mode="public" slug="default" key={prospectKey} />;
+}
+
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('offer-builder-token');
@@ -75,6 +81,11 @@ export function App() {
             <Route
               path="/offer/:slug"
               element={<PublicOfferRoute />}
+            />
+            {/* Industry surface: prospect-linked offer or 404 */}
+            <Route
+              path="/offer/prospect/:prospectKey"
+              element={<PublicProspectRoute />}
             />
             <Route 
               path="/*" 
