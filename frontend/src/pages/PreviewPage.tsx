@@ -87,14 +87,18 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     fetchOffer();
   }, [id, industryId, mode, slug, prospectKey, refreshTick]);
 
-  // Report content height to an embedding parent (ui-kit iframe) so it can
+  // Report CONTENT height to an embedding parent (ui-kit iframe) so it can
   // size the frame instead of scrolling inside it on mobile. Public mode only.
+  // Measures the content wrapper — never document scrollHeight, which is
+  // floored at the viewport height and would lock the frame at whatever
+  // fallback size the parent started with.
+  const contentRef = React.useRef<HTMLDivElement>(null);
   const lastPostedHeight = React.useRef(0);
   React.useEffect(() => {
     if (mode !== 'public') return;
     const post = () => {
       try {
-        const h = Math.ceil(document.documentElement.scrollHeight);
+        const h = Math.ceil(contentRef.current?.offsetHeight || 0);
         if (h > 0 && h !== lastPostedHeight.current) {
           lastPostedHeight.current = h;
           window.parent.postMessage({ type: 'offer:height', height: h }, '*');
@@ -357,7 +361,11 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     : null;
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+    <div
+      ref={contentRef}
+      className={`${mode === 'public' ? '' : 'min-h-screen '}bg-white`}
+      style={{ fontFamily: 'Satoshi, system-ui, sans-serif' }}
+    >
       {/* ===== HERO — literal copy of ui-kit/apps/web/src/pages/offer-funnel-page.tsx ===== */}
       <section
         id="offer-hero"
