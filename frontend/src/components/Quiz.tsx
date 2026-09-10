@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export type QuizQuestion = { id: string; question: string; options: Array<string | { id?: string; text: string; dq?: boolean; fbLead?: boolean; nextQuestion?: string }> };
@@ -152,6 +152,43 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
       console.log('[Quiz] injected Calendly widget.js for', srcToInject);
     }
   }, [done, isEmbed, embedSrc, isEmbedDisqualified, embedSrcDisqualified, isDisqualified]);
+
+  // The inline-widget div only mounts AFTER the lead is created, long after
+  // widget.js scans the DOM — so explicitly init it on mount. Without this
+  // the div sits blank with just its data-url attribute.
+  const embedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!leadCreated || !activeIsEmbed || !activeEmbedSrc) return;
+    const init = () => {
+      const w = (window as any).Calendly;
+      const el = embedRef.current;
+      if (w && el && typeof w.initInlineWidget === 'function') {
+        try {
+          el.innerHTML = '';
+          w.initInlineWidget({ url: activeEmbedSrc, parentElement: el });
+          console.log('[Quiz] Calendly initInlineWidget ok', activeEmbedSrc);
+          return true;
+        } catch (e) {
+          console.warn('[Quiz] Calendly init failed', e);
+        }
+      }
+      return false;
+    };
+    if (init()) return;
+    let s = document.querySelector<HTMLScriptElement>('script[src="https://assets.calendly.com/assets/external/widget.js"]');
+    if (!s) {
+      s = document.createElement('script');
+      s.src = 'https://assets.calendly.com/assets/external/widget.js';
+      s.async = true;
+      document.body.appendChild(s);
+    }
+    s.addEventListener('load', init, { once: true });
+    const t = window.setTimeout(init, 2000);
+    return () => {
+      window.clearTimeout(t);
+      s?.removeEventListener('load', init);
+    };
+  }, [leadCreated, activeIsEmbed, activeEmbedSrc]);
 
   function handleSelect(rawOpt: string | any) {
     const text = typeof rawOpt === 'string' ? rawOpt : rawOpt?.text || String(rawOpt);
@@ -425,7 +462,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
 
                 {leadCreated && activeIsEmbed && activeEmbedSrc ? (
                   <div className="mt-5 rounded-xl overflow-hidden border border-[var(--ods-border,#e5e5ea)] bg-white" style={{ minWidth: 320, height: 700 }}>
-                    <div className="calendly-inline-widget" data-url={activeEmbedSrc} style={{ minWidth: 320, height: 700 }} />
+                    <div ref={embedRef} className="calendly-inline-widget" data-url={activeEmbedSrc} style={{ minWidth: 320, height: 700 }} />
                   </div>
                 ) : leadCreated && activeCalendlyUrl ? (
                   <div className="mt-5 rounded-xl overflow-hidden border border-[var(--ods-border,#e5e5ea)] bg-white" style={{ height: '640px' }}>
