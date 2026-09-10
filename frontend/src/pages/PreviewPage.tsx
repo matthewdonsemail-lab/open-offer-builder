@@ -37,11 +37,32 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
   // Public funnel has no :id param — fall back to the loaded offer id, then slug.
   const storageId = id || offer?.id || slug;
 
+  const prospectKey = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('prospect') || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const [prospect, setProspect] = React.useState<{
+    id?: string;
+    city?: string | null;
+    region?: string | null;
+    name?: string | null;
+    niche?: string | null;
+  } | null>(null);
+
   React.useEffect(() => {
     async function fetchOffer() {
       try {
         const isPublic = mode === 'public';
-        const url = isPublic ? `/api/public/offers/${slug}` : `/api/offers/${id}`;
+        const offerPath = isPublic && prospectKey
+          ? `/api/public/offers/${slug}?prospect=${encodeURIComponent(prospectKey)}`
+          : isPublic
+            ? `/api/public/offers/${slug}`
+            : `/api/offers/${id}`;
+        const url = offerPath;
         const token = isPublic ? null : localStorage.getItem('offer-builder-token');
         console.log('[PreviewPage] fetching offer', isPublic ? slug : id, 'industry', industryId, 'mode:', mode, 'token present:', !!token);
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -64,7 +85,25 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
       }
     }
     fetchOffer();
-  }, [id, industryId, mode, slug, refreshTick]);
+  }, [id, industryId, mode, slug, prospectKey, refreshTick]);
+
+  // Industry pages pass ?prospect=<id|slug> so copy tailors to the record.
+  React.useEffect(() => {
+    if (mode !== 'public' || !prospectKey) return;
+    let cancelled = false;
+    fetch(`/api/public/prospects/${encodeURIComponent(prospectKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!cancelled && p) {
+          setProspect(p);
+          console.log('[Preview] prospect tailored', { city: p.city, niche: p.niche });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, prospectKey]);
 
   // Save → preview bridge (preview mode only): the editor broadcasts
   // `offer:saved:<id>` on save via localStorage + postMessage; the 20s poll
@@ -280,39 +319,6 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
       return '';
     }
   })();
-
-  const prospectKey = (() => {
-    try {
-      return new URLSearchParams(window.location.search).get('prospect') || '';
-    } catch {
-      return '';
-    }
-  })();
-
-  const [prospect, setProspect] = React.useState<{
-    city?: string | null;
-    region?: string | null;
-    name?: string | null;
-    niche?: string | null;
-  } | null>(null);
-
-  // Industry pages pass ?prospect=<id|slug> so copy tailors to the record.
-  React.useEffect(() => {
-    if (mode !== 'public' || !prospectKey) return;
-    let cancelled = false;
-    fetch(`/api/public/prospects/${encodeURIComponent(prospectKey)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => {
-        if (!cancelled && p) {
-          setProspect(p);
-          console.log('[Preview] prospect tailored', { city: p.city, niche: p.niche });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, prospectKey]);
 
   // {{area}} priority: explicit ?area= → linked prospect record → dashed
   // token placeholder. Industry iframes send ?prospect= so the funnel reads

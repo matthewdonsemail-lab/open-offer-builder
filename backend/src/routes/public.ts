@@ -55,13 +55,41 @@ function isUuid(value: string): boolean {
  * Unauthenticated visual payload for the public funnel at offer.domain.com.
  * :slug may be a Twenty record id, a slugified title/name, or "default"
  * (first ACTIVE offer, else first offer).
+ * ?prospect=<id|slug> overrides: serves the offer linked to that prospect
+ * (offer.name === prospect id, the per-prospect convention), falling back
+ * to the slug logic when no linked offer exists.
  */
 router.get("/offers/:slug", async (req, res) => {
   try {
     const slug = req.params.slug as string;
+    const prospectKey = req.query.prospect as string | undefined;
     let offer: TwentyRecord | null = null;
 
-    if (slug === "default") {
+    if (prospectKey) {
+      let prospectId: string | null = null;
+      if (isUuid(prospectKey)) {
+        prospectId = prospectKey;
+      } else {
+        try {
+          const matches = await twentyClient.list<TwentyRecord>("agencyProspects", {
+            limit: 1,
+            filter: `slug[eq]:${prospectKey}`,
+          } as any);
+          prospectId = ((matches[0] as any)?.id as string) ?? null;
+        } catch {
+          prospectId = null;
+        }
+      }
+      if (prospectId) {
+        const offers = await twentyClient.list<TwentyRecord>(OBJECT_NAME, 100);
+        offer =
+          offers.find((o) => String((o as any).name || "") === prospectId) ??
+          null;
+        if (offer) log.info(`Serving prospect-linked offer ${(offer as any).id} for prospect ${prospectId}`);
+      }
+    }
+
+    if (!offer && slug === "default") {
       const offers = await twentyClient.list<TwentyRecord>(OBJECT_NAME, 100);
       offer =
         offers.find((o) => String((o as any).status || "").toUpperCase() === "ACTIVE") ??
