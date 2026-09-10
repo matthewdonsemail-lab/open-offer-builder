@@ -87,6 +87,34 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     fetchOffer();
   }, [id, industryId, mode, slug, prospectKey, refreshTick]);
 
+  // Report content height to an embedding parent (ui-kit iframe) so it can
+  // size the frame instead of scrolling inside it on mobile. Public mode only.
+  const lastPostedHeight = React.useRef(0);
+  React.useEffect(() => {
+    if (mode !== 'public') return;
+    const post = () => {
+      try {
+        const h = Math.ceil(document.documentElement.scrollHeight);
+        if (h > 0 && h !== lastPostedHeight.current) {
+          lastPostedHeight.current = h;
+          window.parent.postMessage({ type: 'offer:height', height: h }, '*');
+        }
+      } catch {}
+    };
+    post();
+    const ro = new ResizeObserver(post);
+    try {
+      ro.observe(document.documentElement);
+    } catch {}
+    window.addEventListener('resize', post);
+    const t = window.setInterval(post, 1500);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', post);
+      window.clearInterval(t);
+    };
+  }, [mode, quizKey, qualification, meetingBooked, leadId, offer?.id]);
+
   // Industry pages pass ?prospect=<id|slug> so copy tailors to the record.
   React.useEffect(() => {
     if (mode !== 'public' || !prospectKey) return;

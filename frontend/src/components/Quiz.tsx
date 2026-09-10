@@ -481,14 +481,11 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                     </p>
                   </div>
                 ) : leadCreated && !isDisqualified ? (
-                  <motion.a
-                    href="#consultation"
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="mt-5 inline-flex items-center gap-2 h-11 px-7 text-[14px] font-semibold bg-[#2563eb] text-white rounded-lg hover:bg-[#1d4ed8] transition-colors shadow-[0_4px_14px_rgba(37,99,235,0.3)]"
-                  >
-                    Book Strategy Call →
-                  </motion.a>
+                  <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
+                    <p className="text-[14px] font-semibold text-[#0D2A4C]">
+                      Thanks — we'll be in touch shortly to schedule your call.
+                    </p>
+                  </div>
                 ) : null}
 
               </motion.div>
