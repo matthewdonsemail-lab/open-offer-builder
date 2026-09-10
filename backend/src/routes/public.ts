@@ -94,6 +94,47 @@ router.get("/offers/:slug", async (req, res) => {
 });
 
 /**
+ * GET /api/public/prospects/:key
+ * Unauthenticated prospect lookup for copy tailoring (industry pages).
+ * :key may be a record id or slug. Returns ONLY city/region/name/niche —
+ * no contact PII ever leaves through this route.
+ */
+router.get("/prospects/:key", async (req, res) => {
+  try {
+    const key = req.params.key as string;
+    let record: TwentyRecord | null = null;
+    if (isUuid(key)) {
+      try {
+        record = await twentyClient.get<TwentyRecord>("agencyProspects", key);
+      } catch {
+        record = null;
+      }
+    } else {
+      const matches = await twentyClient.list<TwentyRecord>("agencyProspects", {
+        limit: 1,
+        filter: `slug[eq]:${key}`,
+      } as any);
+      record = matches[0] ?? null;
+    }
+    if (!record) {
+      res.status(404).json({ error: "Prospect not found" });
+      return;
+    }
+    const r = record as unknown as Record<string, any>;
+    res.json({
+      id: r.id,
+      name: r.name ?? null,
+      city: r.city ?? null,
+      region: r.region ?? null,
+      niche: r.niche ?? null,
+    });
+  } catch (err: any) {
+    log.error(`Error serving public prospect ${req.params.key}:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/public/leads
  * Unauthenticated lead capture for the public funnel.
  * Body: { offerId, firstName?, lastName?, email?, phone?, quizAnswers?,

@@ -281,10 +281,45 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     }
   })();
 
-  // {{area}} resolves ONLY from an explicit ?area= param — never from a
-  // prospect record. Template offers with no prospect show the dashed token.
+  const prospectKey = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('prospect') || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const [prospect, setProspect] = React.useState<{
+    city?: string | null;
+    region?: string | null;
+    name?: string | null;
+    niche?: string | null;
+  } | null>(null);
+
+  // Industry pages pass ?prospect=<id|slug> so copy tailors to the record.
+  React.useEffect(() => {
+    if (mode !== 'public' || !prospectKey) return;
+    let cancelled = false;
+    fetch(`/api/public/prospects/${encodeURIComponent(prospectKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!cancelled && p) {
+          setProspect(p);
+          console.log('[Preview] prospect tailored', { city: p.city, niche: p.niche });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, prospectKey]);
+
+  // {{area}} priority: explicit ?area= → linked prospect record → dashed
+  // token placeholder. Industry iframes send ?prospect= so the funnel reads
+  // the actual row instead of generic copy.
+  const area = areaParam || prospect?.city || '';
   const heroLedeHtml = (offer.heroLede as any)?.markdown
-    ? resolveAreaTokens((offer.heroLede as any).markdown, { area: areaParam, keepTokenIfMissing: true })
+    ? resolveAreaTokens((offer.heroLede as any).markdown, { area, keepTokenIfMissing: true })
     : null;
 
   return (
