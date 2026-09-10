@@ -12,8 +12,6 @@ import type { ThankYouData } from '@/components/ThankYouEditor';
 import { DisqualifiedForm } from '@/components/DisqualifiedForm';
 import type { DisqualifiedData } from '@/components/DisqualifiedForm';
 import { SettingsForm } from '@/components/SettingsForm';
-import { UtmSwapsForm } from '@/components/UtmSwapsForm';
-import type { UtmSwapsData } from '@/components/UtmSwapsForm';
 import { RichEditor } from '@/components/RichEditor';
 import { resolveAreaTokens } from '@/lib/resolveTokens';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -39,24 +37,9 @@ export function OfferDetailPage() {
   const [metaPixelId, setMetaPixelId] = useState('');
   const [saving, setSaving] = useState(false);
   const defaultQuizData: QualifierQuizData = {
-    introTitle: 'See if your market is available - book a strategy call now',
-    introDesc: 'We only work with 1 agency per market — answer a few quick questions.',
-    questions: [
-      { id: 'q1', question: 'What is your current active census?', type: 'Multiple choice', options: [
-        { id: 'q1o1', text: '0-15 Clients (startup)', dq: false, fbLead: true, nextQuestion: 'Go to Q2: Do you have $5,000 (cash o' },
-        { id: 'q1o2', text: '15-40 Clients (growing)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
-        { id: 'q1o3', text: '40-99 Clients (scaling)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
-        { id: 'q1o4', text: '100+ Clients (established)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
-      ]},
-      { id: 'q2', question: 'Do you have $5,000 available to invest in growth this month?', type: 'Multiple choice', options: [
-        { id: 'q2o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
-        { id: 'q2o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
-      ]},
-      { id: 'q3', question: 'Does your home care agency serve the area shown above?', type: 'Multiple choice', options: [
-        { id: 'q3o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
-        { id: 'q3o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
-      ]},
-    ],
+    introTitle: '',
+    introDesc: '',
+    questions: [],
     contactInfo: 'Collect at end',
     onQualified: 'Show embed',
     calendlyEmbed: '',
@@ -64,7 +47,6 @@ export function OfferDetailPage() {
   const [quizData, setQuizData] = useState<QualifierQuizData>(defaultQuizData);
   const [thankYouData, setThankYouData] = useState<ThankYouData | undefined>(undefined);
   const [disqualifiedData, setDisqualifiedData] = useState<DisqualifiedData | undefined>(undefined);
-  const [utmSwaps, setUtmSwaps] = useState<UtmSwapsData | undefined>(undefined);
 
   useEffect(() => {
     if (offer) {
@@ -78,6 +60,11 @@ export function OfferDetailPage() {
       const cal = (offer as any).calendlyUrl || '';
       setCalendlyUrl(cal);
       setMetaPixelId((offer as any).metaPixelId || '');
+      // Reset everything first so switching offers can never leak one
+      // record's configs into another — then fill from this record only.
+      setQuizData((prev) => ({ ...prev, questions: [], calendlyEmbed: cal }));
+      setThankYouData(undefined);
+      setDisqualifiedData(undefined);
       // hydrate quiz if stored as JSON string or array — normalize string options to new object shape
       const rawQuiz = (offer as any).quizConfig || (offer as any).quiz;
       if (rawQuiz) {
@@ -97,8 +84,6 @@ export function OfferDetailPage() {
             setQuizData((prev) => ({ ...prev, questions: normalized, calendlyEmbed: cal || prev.calendlyEmbed }));
           }
         } catch {}
-      } else if (cal) {
-        setQuizData((prev) => ({ ...prev, calendlyEmbed: cal }));
       }
       const rawThank = (offer as any).thankYouConfig;
       if (rawThank) {
@@ -114,24 +99,15 @@ export function OfferDetailPage() {
           if (parsed && typeof parsed === 'object') setDisqualifiedData(parsed);
         } catch {}
       }
-      const rawUtm = (offer as any).utmSwaps;
-      if (rawUtm) {
-        try {
-          const parsed = typeof rawUtm === 'string' ? JSON.parse(rawUtm) : rawUtm;
-          if (parsed && typeof parsed === 'object') setUtmSwaps(parsed);
-        } catch {}
-      }
     }
   }, [offer]);
 
-  const [activeTab, setActiveTab] = useState<'landing'|'thankyou'|'disqualified'|'settings'|'utm'|'proposals'>('landing');
-  const TABS: Array<{id:'landing'|'thankyou'|'disqualified'|'settings'|'utm'|'proposals', label:string}> = [
+  const [activeTab, setActiveTab] = useState<'landing'|'thankyou'|'disqualified'|'settings'>('landing');
+  const TABS: Array<{id:'landing'|'thankyou'|'disqualified'|'settings', label:string}> = [
     { id: 'landing', label: 'Landing page' },
     { id: 'thankyou', label: 'Thank-you' },
     { id: 'disqualified', label: 'Disqualified' },
     { id: 'settings', label: 'Settings' },
-    { id: 'utm', label: 'UTM swaps' },
-    { id: 'proposals', label: 'Proposals' },
   ];
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -150,7 +126,6 @@ export function OfferDetailPage() {
         quizConfig: quizData.questions,
         thankYouConfig: thankYouData || undefined,
         disqualifiedConfig: disqualifiedData || undefined,
-        utmSwaps: utmSwaps || undefined,
         // prefer QualifierQuiz's calendlyEmbed, fallback to separate state
         ...( (quizData.calendlyEmbed || calendlyUrl) && { calendlyUrl: quizData.calendlyEmbed || calendlyUrl }),
       };
@@ -443,23 +418,6 @@ export function OfferDetailPage() {
             title={title}
           />
         )}
-        {activeTab === 'utm' && (
-          <UtmSwapsForm
-            value={utmSwaps}
-            onChange={(next) => {
-              setUtmSwaps(next);
-              console.log('[OfferDetail] utmSwaps change', JSON.stringify(next, null, 2).slice(0, 400));
-            }}
-          />
-        )}
-        {activeTab === 'proposals' && (
-          <div className="mx-auto max-w-4xl py-12 text-center">
-            <WidgetCard title="Proposals">
-              <p className="text-[13px] text-[var(--ods-text-secondary)]">Proposals content — link or embed proposals for this offer.</p>
-            </WidgetCard>
-          </div>
-        )}
-
         {activeTab === 'landing' && (
           <QualifierQuiz
             value={quizData}
