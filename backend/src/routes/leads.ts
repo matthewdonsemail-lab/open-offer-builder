@@ -23,8 +23,14 @@ export interface CreateLeadInput {
   prospectId?: string;
   quizData?: any;
   sourceUrl?: string;
+  visitorId?: string;
   utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
   fbclid?: string;
+  gclid?: string;
 }
 
 /**
@@ -32,7 +38,7 @@ export interface CreateLeadInput {
  * unauthenticated POST /api/public/leads funnel endpoint.
  */
 export async function createAgencyLead(input: CreateLeadInput): Promise<TwentyRecord> {
-  const { offerId, answers, contact, qualificationStatus, source, prospectId, quizData, sourceUrl, utmSource, fbclid } = input;
+  const { offerId, answers, contact, qualificationStatus, source, prospectId, quizData, sourceUrl, visitorId, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, fbclid, gclid } = input;
 
   // Determine qualification if not provided: if any answer option was DQ, mark disqualified
   let finalQualification = qualificationStatus;
@@ -51,8 +57,14 @@ export async function createAgencyLead(input: CreateLeadInput): Promise<TwentyRe
   if (quizData) noteParts.push(`Quiz detail: ${JSON.stringify(quizData, null, 2)}`);
   if (offerId) noteParts.push(`OfferId: ${offerId}`);
   if (sourceUrl) noteParts.push(`Source URL: ${sourceUrl}`);
+  if (visitorId) noteParts.push(`visitor_id: ${visitorId}`);
   if (utmSource) noteParts.push(`UTM source: ${utmSource}`);
+  if (utmMedium) noteParts.push(`UTM medium: ${utmMedium}`);
+  if (utmCampaign) noteParts.push(`UTM campaign: ${utmCampaign}`);
+  if (utmContent) noteParts.push(`UTM content: ${utmContent}`);
+  if (utmTerm) noteParts.push(`UTM term: ${utmTerm}`);
   if (fbclid) noteParts.push(`fbclid: ${fbclid}`);
+  if (gclid) noteParts.push(`gclid: ${gclid}`);
   const note = noteParts.join('\n\n').slice(0, 9000);
 
   // Build note with contact + answers for reliable storage (EMAILS type is finicky)

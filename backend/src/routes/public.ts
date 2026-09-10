@@ -97,8 +97,9 @@ router.get("/offers/:slug", async (req, res) => {
  * POST /api/public/leads
  * Unauthenticated lead capture for the public funnel.
  * Body: { offerId, firstName?, lastName?, email?, phone?, quizAnswers?,
- *   answers?, contact?, qualificationStatus?, sourceUrl?, utmSource?,
- *   fbclid?, prospectId?, source? }
+ *   answers?, contact?, qualificationStatus?, sourceUrl?, visitorId?,
+ *   utmSource?, utmMedium?, utmCampaign?, utmContent?, utmTerm?,
+ *   fbclid?, gclid?, prospectId?, source? }
  * Returns { success, leadId } for Calendly routing on the client.
  */
 router.post("/leads", async (req, res) => {
@@ -114,8 +115,14 @@ router.post("/leads", async (req, res) => {
       contact,
       qualificationStatus,
       sourceUrl,
+      visitorId,
       utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      utmTerm,
       fbclid,
+      gclid,
       prospectId,
       source,
       quizData,
@@ -142,8 +149,14 @@ router.post("/leads", async (req, res) => {
       prospectId,
       quizData,
       sourceUrl,
+      visitorId,
       utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      utmTerm,
       fbclid,
+      gclid,
     });
     res.status(201).json({ success: true, leadId: created.id });
   } catch (err: any) {

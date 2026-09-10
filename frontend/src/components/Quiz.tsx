@@ -211,8 +211,14 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
           quizData: qs,
           source: 'offer-quiz',
           sourceUrl: window.location.href,
+          visitorId: params.get('visitor_id') || undefined,
           utmSource: params.get('utm_source') || undefined,
+          utmMedium: params.get('utm_medium') || undefined,
+          utmCampaign: params.get('utm_campaign') || undefined,
+          utmContent: params.get('utm_content') || undefined,
+          utmTerm: params.get('utm_term') || undefined,
           fbclid: params.get('fbclid') || undefined,
+          gclid: params.get('gclid') || undefined,
         }),
       });
       const data = await res.json();
@@ -430,6 +436,12 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                       title="Schedule a call"
                       allow="fullscreen"
                     />
+                  </div>
+                ) : leadCreated && !isDisqualified && (thankYou as any)?.hideBookingCta ? (
+                  <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
+                    <p className="text-[14px] font-semibold text-[#0D2A4C]">
+                      {(thankYou as any)?.callbackNote || "Request received — we'll call you at your preferred time."}
+                    </p>
                   </div>
                 ) : leadCreated && !isDisqualified ? (
                   <motion.a
