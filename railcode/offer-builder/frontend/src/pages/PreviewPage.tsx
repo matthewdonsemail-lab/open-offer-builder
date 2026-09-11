@@ -384,9 +384,8 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     ? utmSwap.html
     : (offer.heroLede as any)?.markdown;
 
-  const heroHeadline = meetingBooked && activeDoneCfg?.heading ? (
-    <span>{activeDoneCfg.heading}</span>
-  ) : effH1 ? (
+  // H1 only renders pre-booking; the booked view carries its own header.
+  const heroHeadline = effH1 ? (
     <span dangerouslySetInnerHTML={{ __html: effH1 }} />
   ) : (
     effTitle || 'Your Trusted Offer'
@@ -452,11 +451,13 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
               </div>
             </div>
           )}
-          <h1 id="offer-heading" className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-[#0D2A4C] sm:text-5xl md:text-6xl lg:text-7xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-            {heroHeadline}
-          </h1>
+          {!meetingBooked && (
+            <h1 id="offer-heading" className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-[#0D2A4C] sm:text-5xl md:text-6xl lg:text-7xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+              {heroHeadline}
+            </h1>
+          )}
 
-          {heroLedeHtml ? (
+          {!meetingBooked && heroLedeHtml ? (
             <p className="max-w-2xl text-xl text-[#0D2A4C]/60 md:text-2xl">
               <span dangerouslySetInnerHTML={{ __html: heroLedeHtml }} />
             </p>
@@ -489,9 +490,22 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
             </div>
           )}
 
-          {meetingBooked ? (
-            <div id="booked-content" className="mx-auto w-full max-w-5xl">
-              {bookedVideos.length > 0 && (
+{meetingBooked ? (
+            <div id="booked-content" className="mx-auto w-full max-w-3xl scroll-mt-6">
+              <div className="mb-8 text-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[12px] font-semibold">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {activeDoneCfg?.badgeText || (qualification === 'DISQUALIFIED' ? 'Thanks for your interest' : "You're booked")}
+                </span>
+                <h2 className="mt-4 font-heading text-2xl font-bold leading-snug text-[#0D2A4C] sm:text-3xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                  {activeDoneCfg?.heading || (qualification === 'DISQUALIFIED'
+                    ? "Thanks for your time — we'll review your details and be in touch."
+                    : 'Watch this while you wait for your call.')}
+                </h2>
+              </div>
+              {bookedVideos.length > 0 ? (
                 <>
                   {(() => {
                     const [main, ...rest] = bookedVideos;
@@ -529,6 +543,10 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                     );
                   })()}
                 </>
+              ) : (
+                <p className="text-center text-[14px] text-[#0D2A4C]/60">
+                  You're all set — your confirmation is on its way to your inbox.
+                </p>
               )}
             </div>
           ) : (
@@ -587,17 +605,20 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
           )}
         </div>
 
+        {/* Worked-with logos — pre-booking only; the booked view is the video. */}
+      {!meetingBooked && (
         <LogoCarousel
-        logos={carouselLogos}
-        heading={typeof (offer as any)?.carouselHeading === 'string' ? (offer as any).carouselHeading : undefined}
-        descMarkdown={(() => {
-          const raw = (offer as any)?.carouselDesc;
-          if (!raw) return undefined;
-          if (typeof raw === 'string') return raw;
-          return typeof raw.markdown === 'string' ? raw.markdown : undefined;
-        })()}
-        area={area}
-      />
+          logos={carouselLogos}
+          heading={typeof (offer as any)?.carouselHeading === 'string' ? (offer as any).carouselHeading : undefined}
+          descMarkdown={(() => {
+            const raw = (offer as any)?.carouselDesc;
+            if (!raw) return undefined;
+            if (typeof raw === 'string') return raw;
+            return typeof raw.markdown === 'string' ? raw.markdown : undefined;
+          })()}
+          area={area}
+        />
+      )}
       </section>
 
       {mode === 'preview' && (
