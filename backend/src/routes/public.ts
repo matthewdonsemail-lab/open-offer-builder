@@ -19,6 +19,9 @@ const VISUAL_KEYS = [
   "heroH1",
   "heroLede",
   "videoUrl",
+  "videoMode",
+  "industryId",
+  "prospectId",
   "quizConfig",
   "quiz",
   "thankYouConfig",
@@ -28,6 +31,12 @@ const VISUAL_KEYS = [
   "metaPixelId",
   "status",
   "utmSwaps",
+  "mediaLogos",
+  "carouselHeading",
+  "carouselDesc",
+  "brandName",
+  "brandSub",
+  "brandLogoUrl",
 ] as const;
 
 function toVisualPayload(record: Record<string, any>): Record<string, any> {
@@ -51,11 +60,59 @@ function isUuid(value: string): boolean {
 }
 
 /**
+ * Industry routing resolved from the agencyCampaign row — never hardcoded.
+ * Prefers the prospect's linked campaign; falls back to the campaign whose
+ * industryId matches the prospect label. Returns null when unconfigured
+ * (caller 404s explicitly instead of inventing a default).
+ */
+async function resolveIndustryRouting(
+  prospect: TwentyRecord,
+): Promise<{ urlKey: string; twentyValue: string } | null> {
+  const label = String((prospect as any).label?.value ?? (prospect as any).label ?? "");
+  const linked = (prospect as any).campaignId ?? (prospect as any).campaignIdId;
+  const linkedId = typeof linked === "string" ? linked : linked?.id;
+  if (linkedId) {
+    try {
+      const campaign = await twentyClient.get<TwentyRecord>("agencyCampaigns", linkedId);
+      const urlKey = (campaign as any).urlKey;
+      if (typeof urlKey === "string" && urlKey.length > 0) {
+        return { urlKey, twentyValue: label };
+      }
+    } catch {
+      // fall through to industryId filter
+    }
+  }
+  if (!label) return null;
+  try {
+    const campaigns = await twentyClient.list<TwentyRecord>("agencyCampaigns", {
+      limit: 1,
+      filter: `industryId[eq]:${label}`,
+    } as any);
+    const row = campaigns[0] as any;
+    if (row && typeof row.urlKey === "string" && row.urlKey.length > 0) {
+      return { urlKey: row.urlKey, twentyValue: label };
+    }
+  } catch {
+    // unconfigured
+  }
+  return null;
+}
+
+function primaryLinkUrl(videoUrl: unknown): string | undefined {
+  if (videoUrl && typeof videoUrl === "object") {
+    const u = (videoUrl as Record<string, unknown>).primaryLinkUrl;
+    if (typeof u === "string" && u.length > 0) return u;
+  }
+  return undefined;
+}
+
+/**
  * GET /api/public/offers/by-prospect/:key
- * Industry pages resolve here: serves the offer linked to a prospect
- * (offer.name === prospect id, the per-prospect convention).
- * :key may be a prospect record id or slug. 404s when unlinked — there is
- * deliberately NO fallback to a generic offer.
+ * Industry pages resolve here: prospect -> label -> INDUSTRY:{id} offer.
+ * Serves the INDUSTRY offer always (per-prospect name==id rows are retired
+ * from the serve path, kept as builder history).
+ * :key may be a prospect record id or slug. 404s when prospect unknown or
+ * the industry offer is missing — no generic fallback.
  */
 router.get("/offers/by-prospect/:key", async (req, res) => {
   try {
@@ -78,15 +135,54 @@ router.get("/offers/by-prospect/:key", async (req, res) => {
       res.status(404).json({ error: "Prospect not found" });
       return;
     }
-    const offers = await twentyClient.list<TwentyRecord>(OBJECT_NAME, 100);
-    const offer =
-      offers.find((o) => String((o as any).name || "") === prospectId) ?? null;
-    if (!offer) {
-      res.status(404).json({ error: "Offer not found" });
+
+    let prospect: TwentyRecord | null = null;
+    try {
+      prospect = await twentyClient.get<TwentyRecord>("agencyProspects", prospectId);
+    } catch {
+      prospect = null;
+    }
+    if (!prospect) {
+      res.status(404).json({ error: "Prospect not found" });
       return;
     }
-    log.info(`Serving prospect-linked offer ${(offer as any).id} for prospect ${prospectId}`);
-    res.json(toVisualPayload(offer as unknown as Record<string, any>));
+
+    const routing = await resolveIndustryRouting(prospect);
+    if (!routing) {
+      res.status(404).json({ error: "Industry not configured for prospect" });
+      return;
+    }
+    const industryKey = `INDUSTRY:${routing.urlKey}`;
+    const offers = await twentyClient.list<TwentyRecord>(OBJECT_NAME, {
+      limit: 1,
+      filter: `name[eq]:${industryKey}`,
+    } as any);
+    const offer = offers[0] ?? null;
+    if (!offer) {
+      res.status(404).json({ error: "Industry offer not found", industry: routing.urlKey });
+      return;
+    }
+
+    // Effective video: industry CUSTOM override wins, else the prospect video.
+    const mode = String((offer as any).videoMode || "PROSPECT").toUpperCase();
+    const overrideUrl = primaryLinkUrl((offer as any).videoUrl);
+    const prospectUrl = primaryLinkUrl((prospect as any).videoUrl);
+    const effectiveUrl = mode === "CUSTOM" && overrideUrl ? overrideUrl : prospectUrl;
+
+    const payload = toVisualPayload(offer as unknown as Record<string, any>);
+    payload.prospectId = prospectId;
+    payload.industryId = routing.urlKey;
+    // Public business location for {{area}} resolution in quiz intro copy.
+    payload.prospectCity = (prospect as any).city || undefined;
+    payload.prospectRegion = (prospect as any).region || undefined;
+    if (effectiveUrl) {
+      payload.videoUrl = {
+        ...((payload.videoUrl as Record<string, unknown>) || {}),
+        primaryLinkUrl: effectiveUrl,
+      };
+    }
+    log.info(`Serving industry offer ${industryKey} (${(offer as any).id}) for prospect ${prospectId} video=${mode}`);
+    res.json(payload);
   } catch (err: any) {
     log.error(`Error serving prospect offer ${req.params.key}:`, err.message);
     res.status(500).json({ error: err.message });
@@ -170,6 +266,7 @@ router.get("/prospects/:key", async (req, res) => {
       city: r.city ?? null,
       region: r.region ?? null,
       niche: r.niche ?? null,
+      quizCurrency: r.quizCurrency ?? null,
     });
   } catch (err: any) {
     log.error(`Error serving public prospect ${req.params.key}:`, err.message);

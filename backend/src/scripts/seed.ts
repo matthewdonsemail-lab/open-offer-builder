@@ -55,6 +55,12 @@ const CUSTOM_FIELDS = [
   { name: 'thankYouConfig', label: 'Thank You Config', type: 'RAW_JSON', description: 'Thank-you page blocks JSON' },
   { name: 'disqualifiedConfig', label: 'Disqualified Config', type: 'RAW_JSON', description: 'Disqualified page blocks JSON' },
   { name: 'utmSwaps', label: 'UTM Swaps', type: 'RAW_JSON', description: 'Per-UTM text swaps Record' },
+  { name: 'mediaLogos', label: 'Media Logos', type: 'RAW_JSON', description: 'Worked-with logo carousel: [{src, alt}] SVG/IMG URLs rendered navy under the quiz' },
+  { name: 'carouselHeading', label: 'Carousel Heading', type: 'TEXT', description: 'Logo carousel H1 HTML (RichEditor). Falls back to default when blank.' },
+  { name: 'carouselDesc', label: 'Carousel Description', type: 'RICH_TEXT', description: 'Logo carousel description markdown (RichEditor, {{area}} supported), rendered under the marquee.' },
+  { name: 'brandName', label: 'Brand Name', type: 'TEXT', description: 'Brand header name rendered above the hero H1 (e.g. ListeningKit).' },
+  { name: 'brandSub', label: 'Brand Subheading', type: 'TEXT', description: 'Six-word service line under the brand name, dynamically per offer.' },
+  { name: 'brandLogoUrl', label: 'Brand Logo URL', type: 'TEXT', description: 'Brand mark image URL rendered left of the brand name above the hero H1.' },
   { name: 'calendlyUrl', label: 'Calendly URL', type: 'TEXT', description: 'Calendly link shown in iframe at end of quiz' },
   { name: 'metaPixelId', label: 'Meta Pixel ID', type: 'TEXT', description: 'Facebook Meta Pixel ID for this offer (fires PageView + Lead where fbLead true)' },
   {

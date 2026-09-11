@@ -13,6 +13,7 @@
     "@floating-ui/react": "^0.26.24",
     "@heroicons/react": "^2.2.0",
     "@tanstack/react-query": "^5.28.0",
+    "@vidstack/react": "^0.6.15",
     "clsx": "^2.1.1",
     "lucide-react": "^0.400.0",
     "motion": "^13.2.0",
@@ -30,5 +31,8 @@
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3",
     "vite": "^5.3.1"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.63.1"
   }
 }

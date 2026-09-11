@@ -365,20 +365,53 @@ through the backend).
 
 | Field | Type | Notes |
 |-------|------|-------|
-| title / name | TEXT | `name` doubles as `prospectId` lookup (`filter=name[eq]:id`) |
+| title / name | TEXT | Industry rows use `name = INDUSTRY:{industryId}` (`autobody/tint/detailing/general`); per-prospect `name == prospectId` rows are builder history, never served |
+| industryId | SELECT | `AUTO_PAINT_AND_BODY_SHOPS`/`WINDOW_TINTING`/`AUTO_DETAILING`/`GENERAL_TRADES` (mirrors prospect `label`) |
+| videoMode | SELECT | `PROSPECT` (default — serve the prospect record's `videoUrl`) / `CUSTOM` (serve this row's `videoUrl` to the whole industry) |
 | heroH1 | TEXT | raw HTML from RichEditor, rendered verbatim |
 | heroLede | RICH_TEXT | `{markdown, blocknote}` — markdown holds HTML + `{{area}}` |
 | videoUrl | LINKS | `{primaryLinkLabel, primaryLinkUrl, secondaryLinks[]}` |
 | status | SELECT | `DRAFT`/`ACTIVE`/`PAUSED` (UPPER_CASE required) |
 | ctaType | SELECT | `CONSULTATION`/`PRICING`/`CUSTOM` (UPPER_CASE required; currently stored only — the funnel always ends in booking) |
-| quizConfig | RAW_JSON | `QuizQuestion[]` with `dq`/`fbLead`/`nextQuestion` per option |
+| quizConfig | RAW_JSON | `{ introTitle, introDesc, questions[] }` — intro rendered as HTML with `{{area}}`/`{{currency}}` tokens; legacy bare arrays still read |
 | thankYouConfig | RAW_JSON | badge, heading, `video` URL, video grid |
 | disqualifiedConfig | RAW_JSON | same + `calendlyEmbed` (full inline widget HTML) |
 | calendlyUrl | TEXT | qualified Calendly embed HTML (or bare URL) |
 | metaPixelId | TEXT | per-offer Meta Pixel ID, empty = disabled |
-| utmSwaps | RAW_JSON | `{default, rules[]}` per-UTM text overrides |
+| utmSwaps | RAW_JSON | `{ rules: [{ utmSource, field: heroH1\|heroLede\|title, html }] }` — first case-insensitive `?utm_source=` match swaps one hero field per visit |
+| mediaLogos | RAW_JSON | `[{ src, alt?, href? }]` — worked-with carousel under the quiz, navy-tinted at render |
+| carouselHeading | TEXT | carousel H1 HTML (RichEditor); blank falls back to default |
+| carouselDesc | RICH_TEXT | `{markdown}` supporting line under the marquee, `{{area}}`-resolved |
+| brandName / brandSub / brandLogoUrl | TEXT | brand header above hero H1: logo left, name right, sub beneath; all offer-driven |
 
-`status`/`ctaType` option values **must** be UPPER_CASE (Twenty validates). The UI keeps pretty labels and uppercases on write.
+`status`/`ctaType`/`videoMode` option values **must** be UPPER_CASE (Twenty validates). The UI keeps pretty labels and uppercases on write.
+
+### Backend shape — objects, relations, expected values
+
+One `agencyCampaign` per industry owns the industry offer + routing. Campaign rows carry
+`industryId` (same 4 SELECT values), `urlKey` (`autobody/tint/detailing/general`),
+`funnelBaseUrl`, `templateBaseUrl`, `packDir`, `utmSource`, `status`. Runtime code reads
+these rows — hosts and keys are never hardcoded and never defaulted.
+
+```
+agencyProspect.label ──SELECT──▶ industry ──▶ agencyCampaign.industryId
+                                           ├─▶ agencyOffer  (name == INDUSTRY:{urlKey})
+                                           │     └─▶ hero/quiz/videoMode/utmSwaps/mediaLogos/carousel*/brand*
+agencyProspect.campaignId ──RELATION──▶ agencyCampaign ──ROW──▶ urlKey/funnelBaseUrl/templateBaseUrl/packDir
+agencyProspect.videoUrl ──► default funnel video (videoMode=PROSPECT)
+agencyOffer.videoUrl  ──► industry-wide override (videoMode=CUSTOM only)
+agencyLead ◀── funnel capture (prospectId + quiz answers in note)
+```
+
+Serve contract (`GET /api/public/offers/by-prospect/:key`, `:key` = id or slug):
+`INDUSTRY:{urlKey}` row + `prospectId`/`industryId` stamped on the payload + effective
+`videoUrl` resolved server-side. 404s are explicit (`Prospect not found` /
+`Industry not configured` / `Industry offer not found`) — no generic fallback.
+
+Canonical reads: `prospect.label` (never raw `niche`), `phoneNumber` composite before
+`phone` TEXT, `website` TEXT, `{{area}}` from city/region, `{{currency}}` from the
+`quizCurrency` record field (stamped at enrichment). `name` on prospects is the
+**business** name — never split into a person.
 
 ### agencyLeads fields (funnel-created)
 
@@ -394,6 +427,8 @@ through the backend).
 - `GET /api/offers`, `GET /api/offers/:id`, `POST /api/offers`, `PATCH /api/offers/:id`, `DELETE /api/offers/:id` (auth required; save retries without `status`/`ctaType` if Twenty lacks the fields)
 - `POST /api/leads` (**public** — funnel submissions), `GET /api/leads`, `DELETE /api/leads/:id` (preview reset)
 - `GET /api/public/offers/:slug` (**public** — visual-only payload; `:slug` is an offer id, slugified title/name, or `default` = first ACTIVE offer), `POST /api/public/leads` (**public** — funnel capture, returns `{ success, leadId }`)
+- `GET /api/public/offers/by-prospect/:key` (**public** — industry offer for a prospect id or slug, with resolved video + `prospectId`), `GET /api/public/prospects/:key` (**public** — id/name/city/region/niche/currency only, no PII)
+- `POST /api/offers/logo-upload` (auth — brand-logo file upload to R2, returns `{ url }`)
 - `GET /api/prospects` — normalized prospects/leads for the picker
 - `GET /api/health`
 
@@ -467,10 +502,10 @@ The public funnel is chromeless and auth-free, so it drops straight into a
 Twenty dashboard as an iframe widget — no login, no editor chrome:
 
 ```
-https://open-offer-builder.vercel.app/offer
+https://open-offer-builder-chi.vercel.app/offer
 ```
 
-Per-offer dashboards: `https://open-offer-builder.vercel.app/offer/<slug>`
+Per-offer dashboards: `https://open-offer-builder-chi.vercel.app/offer/<slug>`
 (`<slug>` = offer id or slugified title; `/offer` alone serves the first
 `ACTIVE` offer).
 

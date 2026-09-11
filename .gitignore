@@ -23,6 +23,11 @@ frontend/vite.config.d.ts
 # Lefthook personal overrides (per-machine hook tweaks, never shared)
 .lefthook-local.yml
 
+# Client logos — operator-supplied brand art, served from R2 after upload
+# via the editor or ui-kit/apps/web/scripts/upload-offer-logos.ts.
+# Never commit; the live URLs live on agencyOffers.mediaLogos in Twenty.
+logos/
+
 # Logs / coverage
 *.log
 coverage/
