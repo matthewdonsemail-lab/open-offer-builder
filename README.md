@@ -163,14 +163,16 @@ curl -X POST https://offer.domain.com/api/public/leads \
 
 | Tab | Component | Stored as |
 |-----|-----------|-----------|
-| Landing page | Basic Info + Hero Section + Video URL + `QualifierQuiz` | `title/name/heroH1/heroLede/videoUrl/quizConfig` |
+| Landing page | Basic Info + Hero Section + Video URL + Brand header + `QualifierQuiz` + Worked-with logos | `title/name/heroH1/heroLede/videoUrl/brandName/brandSub/brandLogoUrl/quizConfig/mediaLogos/carouselHeading/carouselDesc` — see [agency-offer object](docs/objects/agency-offer.md) |
 | Thank-you | `ThankYouEditor` (badge, heading, video, video grid) | `thankYouConfig` (RAW_JSON) |
 | Disqualified | `DisqualifiedForm` (same blocks + disqualified Calendly) | `disqualifiedConfig` (RAW_JSON) |
 | Settings | `SettingsForm` (Meta Pixel ID, status, CTA type) | `metaPixelId` (TEXT), `status`, `ctaType` |
-| UTM swaps | `UtmSwapsForm` (per-UTM text overrides) | `utmSwaps` (RAW_JSON) |
+| UTM swaps | inline rules editor — per-source hero overrides | `utmSwaps` (RAW_JSON) |
 | Proposals | static placeholder | `ProposalsForm.tsx` exists but is not wired into the tab yet |
 
 ## Quiz system
+
+Quiz intro/questions live on the offer (`quizConfig`) — see [agency-offer object](docs/objects/agency-offer.md).
 
 - `QualifierQuiz.tsx` — the **editor**: intro headline/description, reusable question blocks (text, type selector, delete), option rows (text, **DQ** toggle, **FB lead-event** toggle, next-question routing, delete), add question/option, contact-info + on-qualified settings. DQ/FB controls have hover tooltips explaining exactly what they do.
 - `Quiz.tsx` — the **runtime**: `framer-motion` transitions, progress bar, immediate hover scale, supports `questions` prop (string or `{text, dq, fbLead}` objects).
@@ -303,6 +305,14 @@ open-offer-builder/
 
 ## Twenty CRM integration
 
+Object/field reference lives in [docs/objects/](docs/objects/) — start with
+[conventions](docs/objects/conventions.md), then
+[agency-offer](docs/objects/agency-offer.md),
+[agency-campaign](docs/objects/agency-campaign.md),
+[agency-prospect](docs/objects/agency-prospect.md),
+[agency-lead](docs/objects/agency-lead.md),
+[agency-phone](docs/objects/agency-phone.md).
+
 ### Creating objects with Twenty (REST vs Metadata API)
 
 Two different APIs do two different jobs — mixing them up is the most common
@@ -344,6 +354,8 @@ Custom fields are added the same way (`createOneField` with
 
 ### Seed command (idempotent)
 
+Field-level reference for everything the seed ensures: [agency-offer](docs/objects/agency-offer.md).
+
 `bun run --cwd backend seed` (`backend/src/scripts/seed.ts`) ensures the
 whole thing exists in one go: it creates the `agencyOffers` object **only if
 missing**, then creates each missing custom field (`quizConfig`,
@@ -362,6 +374,8 @@ Run this first on any fresh Twenty workspace, then create records via
 through the backend).
 
 ### agencyOffers fields
+
+> Full reference: [docs/objects/agency-offer.md](docs/objects/agency-offer.md).
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -387,6 +401,11 @@ through the backend).
 `status`/`ctaType`/`videoMode` option values **must** be UPPER_CASE (Twenty validates). The UI keeps pretty labels and uppercases on write.
 
 ### Backend shape — objects, relations, expected values
+
+> Full reference: [agency-campaign](docs/objects/agency-campaign.md) ·
+> [agency-prospect](docs/objects/agency-prospect.md) ·
+> [agency-phone](docs/objects/agency-phone.md) ·
+> [conventions](docs/objects/conventions.md).
 
 One `agencyCampaign` per industry owns the industry offer + routing. Campaign rows carry
 `industryId` (same 4 SELECT values), `urlKey` (`autobody/tint/detailing/general`),
@@ -414,6 +433,8 @@ Canonical reads: `prospect.label` (never raw `niche`), `phoneNumber` composite b
 **business** name — never split into a person.
 
 ### agencyLeads fields (funnel-created)
+
+> Full reference: [docs/objects/agency-lead.md](docs/objects/agency-lead.md).
 
 | Field | Type | Notes |
 |-------|------|-------|
