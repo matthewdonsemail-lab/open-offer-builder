@@ -327,7 +327,13 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
       pushUrl(parsed.video?.title);
       const items = parsed.videoGrid?.items;
       if (Array.isArray(items)) items.forEach((it: any) => pushUrl(it?.videoTitle, it?.title));
-      return { badgeText: parsed.badgeText, heading: parsed.heading, videos };
+      const cols = parsed.videoGrid?.columns;
+      return {
+        badgeText: parsed.badgeText,
+        heading: parsed.heading,
+        videos,
+        columns: typeof cols === 'number' && (cols === 1 || cols === 2 || cols === 3) ? cols : 2,
+      };
     } catch { return undefined; }
   };
   const thankYouCfg = buildDoneContent((offer as any).thankYouConfig);
@@ -509,7 +515,8 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                 <>
                   {(() => {
                     const [main, ...rest] = bookedVideos;
-                    const grid = rest.slice(0, 4);
+                    const grid = rest;
+                    const colClass = activeDoneCfg?.columns === 1 ? 'grid-cols-1' : activeDoneCfg?.columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
                     return (
                       <>
                         <div id="booked-main-video" className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)] scroll-mt-6">
@@ -525,7 +532,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                             <h2 id="booked-faq-heading" className="mt-12 mb-6 text-center font-heading text-3xl font-bold text-[#0D2A4C] md:text-4xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                               Frequently Asked Questions
                             </h2>
-                            <div id="booked-videos" className="grid gap-6 sm:grid-cols-2">
+                            <div id="booked-videos" className={`grid gap-6 ${colClass}`}>
                               {grid.map((v, i) => (
                                 <div key={i}>
                                   <h3 className="mb-2 text-left text-[17px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
