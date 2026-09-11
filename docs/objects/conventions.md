@@ -12,8 +12,9 @@
 
 ## Reading data
 
-- Industry linkage is by SELECT value + `INDUSTRY:{urlKey}` name convention, not
-  RELATION fields (relations already burned us once).
+- Industry linkage is by `agencyOffer.industryId == agencyCampaign.industryId`
+  (SELECT value), not RELATION fields and not a `name` convention (the old
+  `INDUSTRY:{urlKey}` name convention is retired; relations already burned us once).
 - Runtime code reads rows and surfaces explicit states for missing data — hosts,
   keys, and copy are never hardcoded and never defaulted. Seed scripts hold
   initial values only.

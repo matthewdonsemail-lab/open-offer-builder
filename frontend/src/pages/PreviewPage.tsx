@@ -122,9 +122,10 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     };
   }, [mode, quizKey, qualification, meetingBooked, leadId, offer?.id]);
 
-  // Industry pages pass ?prospect=<id|slug> so copy tailors to the record.
+  // ?prospect=<id|slug> (public funnel iframes or the editor's preview-as pick)
+  // loads the prospect record so {{area}} and quiz currency tailor to it.
   React.useEffect(() => {
-    if (mode !== 'public' || !prospectKey) return;
+    if (!prospectKey) return;
     let cancelled = false;
     fetch(`/api/public/prospects/${encodeURIComponent(prospectKey)}`)
       .then((r) => (r.ok ? r.json() : null))

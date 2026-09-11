@@ -9,30 +9,25 @@ import {
   shift,
   FloatingPortal,
 } from '@floating-ui/react';
-async function fetchProspects(industryId?: string) {
-  const token = localStorage.getItem('offer-builder-token');
-  const qs = industryId ? `?industryId=${encodeURIComponent(industryId)}` : '';
-  const res = await fetch(`/api/prospects${qs}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to fetch prospects');
-  return res.json() as Promise<Array<{ id: string; displayName: string; company?: string; email?: string; city?: string; region?: string; industryId?: string }>>;
+import { api } from '@/lib/api';
+
+function fetchIndustries() {
+  return api.industries.list();
 }
 
-interface ProspectSelectProps {
-  value?: string; // prospect id (stored in name field)
-  onChange: (id: string, displayName: string) => void;
+interface IndustrySelectProps {
+  value?: string; // campaign industryId SELECT value (e.g. AUTO_DETAILING); '' = none
+  onChange: (key: string) => void;
   placeholder?: string;
-  industryId?: string; // when set, only prospects of this industry are listed
 }
 
-export function ProspectSelect({ value, onChange, placeholder = 'Search prospect / lead...', industryId }: ProspectSelectProps) {
+export function IndustrySelect({ value, onChange, placeholder = 'Industry (optional)...' }: IndustrySelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const { data: prospects, isLoading } = useQuery({
-    queryKey: ['prospects-select', industryId ?? ''],
-    queryFn: () => fetchProspects(industryId),
+  const { data: industries, isLoading } = useQuery({
+    queryKey: ['industries-select'],
+    queryFn: fetchIndustries,
     enabled: isOpen,
     staleTime: 30_000,
   });
@@ -46,14 +41,14 @@ export function ProspectSelect({ value, onChange, placeholder = 'Search prospect
   });
 
   const filtered = useMemo(() => {
-    if (!prospects) return [];
-    if (!query) return prospects.slice(0, 20);
+    if (!industries) return [];
+    if (!query) return industries.slice(0, 20);
     const q = query.toLowerCase();
-    return prospects.filter((p) => p.displayName.toLowerCase().includes(q) || p.company?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)).slice(0, 20);
-  }, [prospects, query]);
+    return industries.filter((i) => i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q)).slice(0, 20);
+  }, [industries, query]);
 
-  const selected = prospects?.find((p) => p.id === value);
-  const displayValue = selected ? selected.displayName : (value || '');
+  const selected = industries?.find((i) => i.key === value);
+  const displayValue = value ? (selected ? selected.label : value) : '';
 
   return (
     <div className="relative">
@@ -82,7 +77,7 @@ export function ProspectSelect({ value, onChange, placeholder = 'Search prospect
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Type prospect / lead name..."
+                  placeholder="Type industry name..."
                   className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--ods-text-tertiary)]"
                 />
               </div>
@@ -90,45 +85,49 @@ export function ProspectSelect({ value, onChange, placeholder = 'Search prospect
             <div className="max-h-[240px] overflow-y-auto py-1">
               {isLoading ? (
                 <div className="px-3 py-6 text-center text-[13px] text-[var(--ods-text-tertiary)]">Loading...</div>
-              ) : filtered.length === 0 ? (
-                <div className="px-3 py-6 text-center text-[13px] text-[var(--ods-text-tertiary)]">
-                  {industryId ? 'No prospects in this industry' : 'No results'}
-                </div>
               ) : (
-                filtered.map((p) => (
+                <>
                   <button
-                    key={p.id}
                     onClick={() => {
-                      onChange(p.id, p.displayName);
+                      onChange('');
                       setIsOpen(false);
                       setQuery('');
                     }}
                     className={`w-full text-left px-3 h-9 flex items-center justify-between gap-2 text-[13px] hover:bg-[var(--ods-bg-secondary)] transition-colors ${
-                      p.id === value ? 'bg-[var(--ods-bg-secondary)] text-[var(--ods-text-primary)] font-medium' : 'text-[var(--ods-text-secondary)]'
+                      !value ? 'bg-[var(--ods-bg-secondary)] text-[var(--ods-text-primary)] font-medium' : 'text-[var(--ods-text-secondary)]'
                     }`}
                   >
-                    <span className="truncate">
-                      <span className="font-medium">{p.displayName}</span>
-                      {p.company && <span className="ml-1.5 text-[11px] text-[var(--ods-text-tertiary)]">{p.company}</span>}
-                    </span>
-                    {p.id === value && <Check className="w-3.5 h-3.5 text-[var(--ods-brand-600)] shrink-0" />}
+                    <span className="font-medium">None</span>
+                    {!value && <Check className="w-3.5 h-3.5 text-[var(--ods-brand-600)] shrink-0" />}
                   </button>
-                ))
+                  {filtered.length === 0 ? (
+                    <div className="px-3 py-3 text-center text-[12px] text-[var(--ods-text-tertiary)]">
+                      {industries?.length ? 'No results' : 'No industries configured — set an industryId on a campaign in Twenty.'}
+                    </div>
+                  ) : (
+                    filtered.map((ind) => (
+                      <button
+                        key={ind.key}
+                        onClick={() => {
+                          onChange(ind.key);
+                          setIsOpen(false);
+                          setQuery('');
+                        }}
+                        className={`w-full text-left px-3 h-9 flex items-center justify-between gap-2 text-[13px] hover:bg-[var(--ods-bg-secondary)] transition-colors ${
+                          ind.key === value ? 'bg-[var(--ods-bg-secondary)] text-[var(--ods-text-primary)] font-medium' : 'text-[var(--ods-text-secondary)]'
+                        }`}
+                      >
+                        <span className="truncate">
+                          <span className="font-medium">{ind.label}</span>
+                          {ind.key !== ind.label && <span className="ml-1.5 text-[11px] text-[var(--ods-text-tertiary)]">{ind.key}</span>}
+                        </span>
+                        {ind.key === value && <Check className="w-3.5 h-3.5 text-[var(--ods-brand-600)] shrink-0" />}
+                      </button>
+                    ))
+                  )}
+                </>
               )}
             </div>
-            {value && (
-              <div className="p-2 border-t border-[var(--ods-border)]">
-                <button
-                  onClick={() => {
-                    onChange('', '');
-                    setIsOpen(false);
-                  }}
-                  className="w-full h-7 text-[12px] text-[var(--ods-text-tertiary)] hover:text-[var(--ods-text-primary)] transition-colors"
-                >
-                  Clear selection
-                </button>
-              </div>
-            )}
           </div>
         </FloatingPortal>
       )}

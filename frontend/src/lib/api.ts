@@ -80,6 +80,9 @@ export const api = {
       return res.json() as Promise<{ url: string }>;
     },
   },
+  industries: {
+    list: () => request<Array<{ key: string; label: string; urlKey?: string }>>('/api/industries'),
+  },
 };
 
 export function useOffers() {

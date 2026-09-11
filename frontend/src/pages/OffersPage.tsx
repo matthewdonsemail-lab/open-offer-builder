@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOffers, useDeleteOffer } from '@/lib/api';
+import { useOffers, useDeleteOffer, api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import {
   Plus,
@@ -10,8 +10,9 @@ import {
   Eye,
   Pencil,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Spokes } from '@/components/ui/Spinner';
-import { StatusSelect } from '@/components/common/StatusSelect';
+import { StatusSelect, type StatusOption } from '@/components/common/StatusSelect';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -33,10 +34,11 @@ const STATUS_OPTIONS = [
   { value: 'paused', label: 'Paused', dotColor: 'bg-yellow-500', bgTint: 'bg-yellow-500/10', textColor: 'text-yellow-700' },
 ];
 
-const CTA_OPTIONS = [
-  { value: 'consultation', label: 'Consultation', dotColor: 'bg-blue-500', bgTint: 'bg-blue-500/10', textColor: 'text-blue-700' },
-  { value: 'pricing', label: 'Pricing', dotColor: 'bg-green-500', bgTint: 'bg-green-500/10', textColor: 'text-green-700' },
-  { value: 'custom', label: 'Custom', dotColor: 'bg-gray-500', bgTint: 'bg-gray-500/10', textColor: 'text-gray-700' },
+const INDUSTRY_PALETTE = [
+  { dotColor: 'bg-blue-500', bgTint: 'bg-blue-500/10', textColor: 'text-blue-700' },
+  { dotColor: 'bg-purple-500', bgTint: 'bg-purple-500/10', textColor: 'text-purple-700' },
+  { dotColor: 'bg-teal-500', bgTint: 'bg-teal-500/10', textColor: 'text-teal-700' },
+  { dotColor: 'bg-orange-500', bgTint: 'bg-orange-500/10', textColor: 'text-orange-700' },
 ];
 
 function formatDateTime(isoString?: string) {
@@ -127,6 +129,15 @@ export function OffersPage() {
   const navigate = useNavigate();
   const { data: offers, isLoading, error } = useOffers();
   const deleteMutation = useDeleteOffer();
+  const { data: industries = [] } = useQuery({ queryKey: ['industries'], queryFn: api.industries.list });
+  const industryOptions = useMemo<StatusOption[]>(() => {
+    const list: StatusOption[] = [{ value: '', label: 'None', dotColor: 'bg-gray-400', bgTint: 'bg-gray-500/10', textColor: 'text-gray-600' }];
+    industries.forEach((ind, i) => {
+      const c = INDUSTRY_PALETTE[i % INDUSTRY_PALETTE.length];
+      list.push({ value: ind.key, label: ind.label, ...c });
+    });
+    return list;
+  }, [industries]);
   const { success, error: toastError } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -210,9 +221,9 @@ export function OffersPage() {
               <th className="px-3 text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] font-normal">
                 Status
               </th>
-              <th className="px-3 text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] font-normal">
-                CTA Type
-              </th>
+<th className="px-3 text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] font-normal">
+                 Industry
+               </th>
               <th className="px-3 text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] font-normal">
                 Created
               </th>
@@ -275,15 +286,16 @@ export function OffersPage() {
                   </td>
                   <td className="px-3" onClick={(e) => e.stopPropagation()}>
                     <StatusSelect
-                      value={(offer.ctaType as string)?.toLowerCase() || 'consultation'}
+                      value={(offer.industryId as string) || ''}
                       onChange={(v) => {
+                        // inline update via API - optimistic
                         fetch(`/api/offers/${offer.id}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('offer-builder-token')}` },
-                          body: JSON.stringify({ ctaType: v.toUpperCase() }),
+                          body: JSON.stringify({ industryId: v || null }),
                         }).then(() => window.location.reload());
                       }}
-                      options={CTA_OPTIONS}
+                      options={industryOptions}
                     />
                   </td>
                   <td className="px-3 text-[12px] text-[var(--ods-text-secondary,#575757)]">

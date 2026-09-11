@@ -17,6 +17,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import offersRoutes from "./routes/offers.js";
 import prospectsRoutes from "./routes/prospects.js";
+import industriesRoutes from "./routes/industries.js";
 import leadsRoutes from "./routes/leads.js";
 import publicRoutes from "./routes/public.js";
 import { getTwentyPgStatus } from "./db/twenty-pg.js";
@@ -63,6 +64,7 @@ export function createApp() {
   app.use("/api/auth", authRoutes);
   app.use("/api/offers", offersRoutes);
   app.use("/api/prospects", prospectsRoutes);
+  app.use("/api/industries", industriesRoutes);
   app.use("/api/leads", leadsRoutes);
   // Unauthenticated public funnel surface (offer.domain.com) — visual payloads + lead capture only
   app.use("/api/public", publicRoutes);

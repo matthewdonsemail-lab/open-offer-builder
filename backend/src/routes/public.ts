@@ -61,22 +61,25 @@ function isUuid(value: string): boolean {
 
 /**
  * Industry routing resolved from the agencyCampaign row — never hardcoded.
+ * industryValue is the campaign's industryId SELECT value (the same value
+ * stored on offer.industryId, so by-prospect matching is one eq filter).
  * Prefers the prospect's linked campaign; falls back to the campaign whose
  * industryId matches the prospect label. Returns null when unconfigured
  * (caller 404s explicitly instead of inventing a default).
  */
 async function resolveIndustryRouting(
   prospect: TwentyRecord,
-): Promise<{ urlKey: string; twentyValue: string } | null> {
+): Promise<{ industryValue: string; urlKey: string } | null> {
   const label = String((prospect as any).label?.value ?? (prospect as any).label ?? "");
   const linked = (prospect as any).campaignId ?? (prospect as any).campaignIdId;
   const linkedId = typeof linked === "string" ? linked : linked?.id;
   if (linkedId) {
     try {
       const campaign = await twentyClient.get<TwentyRecord>("agencyCampaigns", linkedId);
-      const urlKey = (campaign as any).urlKey;
-      if (typeof urlKey === "string" && urlKey.length > 0) {
-        return { urlKey, twentyValue: label };
+      const industryValue = String((campaign as any).industryId?.value ?? (campaign as any).industryId ?? "");
+      const urlKey = String((campaign as any).urlKey ?? "");
+      if (industryValue) {
+        return { industryValue, urlKey };
       }
     } catch {
       // fall through to industryId filter
@@ -89,8 +92,9 @@ async function resolveIndustryRouting(
       filter: `industryId[eq]:${label}`,
     } as any);
     const row = campaigns[0] as any;
-    if (row && typeof row.urlKey === "string" && row.urlKey.length > 0) {
-      return { urlKey: row.urlKey, twentyValue: label };
+    const industryValue = String(row?.industryId?.value ?? row?.industryId ?? "");
+    if (industryValue) {
+      return { industryValue, urlKey: String(row.urlKey ?? "") };
     }
   } catch {
     // unconfigured
@@ -108,11 +112,12 @@ function primaryLinkUrl(videoUrl: unknown): string | undefined {
 
 /**
  * GET /api/public/offers/by-prospect/:key
- * Industry pages resolve here: prospect -> label -> INDUSTRY:{id} offer.
- * Serves the INDUSTRY offer always (per-prospect name==id rows are retired
- * from the serve path, kept as builder history).
- * :key may be a prospect record id or slug. 404s when prospect unknown or
- * the industry offer is missing — no generic fallback.
+ * Industry pages resolve here: prospect -> agencyCampaign industryId SELECT
+ * value -> the offer whose industryId matches (set via the Industry selector
+ * in the builder; no offer name convention involved).
+ * Serves the industry offer only; 404s when the prospect is unknown or no
+ * offer carries that industryId — no generic fallback.
+ * :key may be a prospect record id or slug.
  */
 router.get("/offers/by-prospect/:key", async (req, res) => {
   try {
@@ -152,14 +157,13 @@ router.get("/offers/by-prospect/:key", async (req, res) => {
       res.status(404).json({ error: "Industry not configured for prospect" });
       return;
     }
-    const industryKey = `INDUSTRY:${routing.urlKey}`;
     const offers = await twentyClient.list<TwentyRecord>(OBJECT_NAME, {
       limit: 1,
-      filter: `name[eq]:${industryKey}`,
+      filter: `industryId[eq]:${routing.industryValue}`,
     } as any);
     const offer = offers[0] ?? null;
     if (!offer) {
-      res.status(404).json({ error: "Industry offer not found", industry: routing.urlKey });
+      res.status(404).json({ error: "Industry offer not found", industry: routing.industryValue });
       return;
     }
 
@@ -171,7 +175,6 @@ router.get("/offers/by-prospect/:key", async (req, res) => {
 
     const payload = toVisualPayload(offer as unknown as Record<string, any>);
     payload.prospectId = prospectId;
-    payload.industryId = routing.urlKey;
     // Public business location for {{area}} resolution in quiz intro copy.
     payload.prospectCity = (prospect as any).city || undefined;
     payload.prospectRegion = (prospect as any).region || undefined;
@@ -181,7 +184,7 @@ router.get("/offers/by-prospect/:key", async (req, res) => {
         primaryLinkUrl: effectiveUrl,
       };
     }
-    log.info(`Serving industry offer ${industryKey} (${(offer as any).id}) for prospect ${prospectId} video=${mode}`);
+    log.info(`Serving industry offer ${routing.industryValue} (${(offer as any).id}) for prospect ${prospectId} video=${mode}`);
     res.json(payload);
   } catch (err: any) {
     log.error(`Error serving prospect offer ${req.params.key}:`, err.message);

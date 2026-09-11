@@ -44,9 +44,14 @@ How it works, end to end:
   per concern (landing, thank-you, disqualified, settings, UTM, proposals).
   Saving whitelists fields and `POST`/`PATCH`es a single `agencyOffers`
   record — configs travel as `RAW_JSON`, embeds/links as `TEXT`/`LINKS`.
+  Basic Info has three cells: **Title**, **Preview as prospect** (ephemeral —
+  tailors the preview only, never persisted), and **Industry** (persisted as
+  the `industryId` SELECT value; one offer serves an entire industry).
 - **Serving:** the public preview (`PreviewPage.tsx`) fetches that one record
   and renders hero, video, and quiz from it. No CMS, no build step — editing
-  the offer changes the funnel immediately.
+  the offer changes the funnel immediately. Industry funnels resolve
+  prospect → campaign → offer via `GET /api/public/offers/by-prospect/:key`
+  and serve the industry's single offer with the prospect's own video/city.
 - **Capture:** quiz answers + contact form `POST /api/leads` (the one public
   route), creating an `agencyLead` tagged `QUALIFIED`/`DISQUALIFIED`.
 - **Booking:** the Calendly widget lives inside `Quiz.tsx`; its
@@ -122,6 +127,27 @@ flowchart TD
 - **Booked state** persists in `localStorage` (`quiz_booking_${offerId}`) so refreshes never resurrect the form; the hero H1 swaps to the branch's Twenty heading.
 - **Preview reset** (floating button, preview only): deletes the test `agencyLead` from Twenty, clears the qualification/booking flags, and remounts the quiz. **Simulate booking** fires the same booked state without a real Calendly booking.
 
+## Industry offers (one funnel per industry)
+
+There is **one offer per industry**, not one per prospect. The builder's
+Basic Info cell **Industry** (`IndustrySelect.tsx`) lists the distinct
+`agencyCampaigns.industryId` values (`GET /api/industries`) and writes the
+selected SELECT value to `offer.industryId`. Serving is then one lookup:
+prospect → campaign → `industryId` match (see the backend shape section below).
+
+Prospects themselves are **never stored on the offer**:
+
+- The **Preview as prospect** cell is ephemeral UI state — it re-resolves
+  `{{area}}` and quiz currency for that prospect in the preview
+  (`?prospect=<id|slug>`) and is dropped on every offer load and save.
+- The legacy conventions are retired: industry rows no longer use
+  `name = INDUSTRY:{key}`, and per-prospect `name == prospectId` rows are not
+  written, served, or read anymore. `ensure-industry-field.ts` scrubs any
+  surviving `INDUSTRY:{key}` names (idempotent).
+- The offers list is a flat searchable table (title/name/heroH1); which
+  industry a row serves is visible in its **Industry** cell, and
+  `GET /api/industries` lists exactly the industries that have a campaign.
+
 ## Public surface vs internal preview (one backend, two surfaces)
 
 The same Express backend serves the internal builder and the fast public
@@ -132,6 +158,7 @@ funnel — only the frontend route and two unauthenticated endpoints differ:
 | Builder (internal) | `domain.com` or `localhost:3000/offers/:id` (+ `/admin/offers/:id` alias) | `OfferDetailPage` | auth `/api/offers/*` |
 | Preview (embedded in Twenty) | `https://offer.domain.com/preview/offers/{{record.id}}` in an iframe | `PreviewPage` (`mode="preview"`) | auth `/api/offers/:id` |
 | Public funnel | `https://offer.domain.com/offer` (or `/offer/:slug`) | `PreviewPage` (`mode="public"`) | **no auth** `/api/public/*` |
+| Industry prospect funnel | `https://offer.domain.com/offer/prospect/<prospect id\|slug>` | `PreviewPage` (`mode="public"`, prospect param) | **no auth** `/api/public/offers/by-prospect/:key` |
 
 DNS/hosting: `domain.com` (marketing, isolated), `offer.domain.com` → CNAME
 to the builder app, `twenty.domain.com` (self-hosted Twenty). The same
@@ -163,7 +190,7 @@ curl -X POST https://offer.domain.com/api/public/leads \
 
 | Tab | Component | Stored as |
 |-----|-----------|-----------|
-| Landing page | Basic Info + Hero Section + Video URL + Brand header + `QualifierQuiz` + Worked-with logos | `title/name/heroH1/heroLede/videoUrl/brandName/brandSub/brandLogoUrl/quizConfig/mediaLogos/carouselHeading/carouselDesc` — see [agency-offer object](docs/objects/agency-offer.md) |
+| Landing page | Basic Info (title, preview-as-prospect, industry) + Hero Section + Video URL + Brand header + `QualifierQuiz` + Worked-with logos | `title/industryId/heroH1/heroLede/videoUrl/brandName/brandSub/brandLogoUrl/quizConfig/mediaLogos/carouselHeading/carouselDesc` — see [agency-offer object](docs/objects/agency-offer.md) |
 | Thank-you | `ThankYouEditor` (badge, heading, video, video grid) | `thankYouConfig` (RAW_JSON) |
 | Disqualified | `DisqualifiedForm` (same blocks + disqualified Calendly) | `disqualifiedConfig` (RAW_JSON) |
 | Settings | `SettingsForm` (Meta Pixel ID, status, CTA type) | `metaPixelId` (TEXT), `status`, `ctaType` |
@@ -274,9 +301,10 @@ open-offer-builder/
 ├── backend/src/
 │   ├── routes/
 │   │   ├── auth.ts        # login via Twenty Postgres, JWT issue
-│   │   ├── offers.ts      # agencyOffers CRUD (POST/PATCH whitelist)
+│   │   ├── offers.ts      # agencyOffers CRUD (POST/PATCH whitelist, incl. industryId)
 │   │   ├── leads.ts       # POST /api/leads (public funnel), DELETE /:id (preview reset)
-│   │   └── prospects.ts   # normalized prospect/lead list (city/region included)
+│   │   ├── prospects.ts   # normalized prospect/lead list (city/region included)
+│   │   └── industries.ts  # GET /api/industries — distinct campaign industryIds for the Industry select
 │   ├── lib/
 │   │   ├── twenty-client.ts  # Twenty REST wrapper
 │   │   └── logger.ts         # timestamped [http]/[auth]/[offers] logs
@@ -284,19 +312,20 @@ open-offer-builder/
 │   ├── middleware/auth.ts    # JWT middleware (throws without JWT_SECRET in prod)
 │   └── scripts/
 │       ├── seed.ts            # ensure agencyOffers object + all fields (start here)
+│       ├── ensure-industry-field.ts  # ensure industryId field + scrub legacy INDUSTRY:{key} names
 │       └── ensure-*.ts        # idempotent single-field bootstrap
 │           (quiz, thankyou, disqualified, calendly, pixel, utm, lead/prospect qual, status/cta)
 ├── frontend/src/
 │   ├── pages/
 │   │   ├── LoginPage.tsx       # TropicalTideBackground + Twenty credential login
-│   │   ├── OffersPage.tsx      # offers table (status/CTA inline selects, delete modal)
-│   │   ├── OfferDetailPage.tsx # 6-tab editor + save with retry
+│   │   ├── OffersPage.tsx      # offers table (searchable; status/CTA inline selects, delete modal)
+│   │   ├── OfferDetailPage.tsx # 6-tab editor + save with retry + preview-as-prospect
 │   │   └── PreviewPage.tsx     # public funnel (/preview/:industryId/:id)
 │   ├── components/
 │   │   ├── Quiz.tsx / QualifierQuiz.tsx
 │   │   ├── ThankYouEditor.tsx / DisqualifiedForm.tsx
 │   │   ├── SettingsForm.tsx / UtmSwapsForm.tsx / ProposalsForm.tsx
-│   │   ├── ProspectSelect.tsx / StatusSelect.tsx / RichEditor.tsx
+│   │   ├── ProspectSelect.tsx / IndustrySelect.tsx / StatusSelect.tsx / RichEditor.tsx
 │   │   └── ui/ (Modal, Button, Badge, Toast, Spinner/Spokes, WidgetCard)
 │   └── lib/
 │       ├── api.ts / resolveTokens.ts / twentyOptions.ts / utils.ts
@@ -379,8 +408,9 @@ through the backend).
 
 | Field | Type | Notes |
 |-------|------|-------|
-| title / name | TEXT | Industry rows use `name = INDUSTRY:{industryId}` (`autobody/tint/detailing/general`); per-prospect `name == prospectId` rows are builder history, never served |
-| industryId | SELECT | `AUTO_PAINT_AND_BODY_SHOPS`/`WINDOW_TINTING`/`AUTO_DETAILING`/`GENERAL_TRADES` (mirrors prospect `label`) |
+| title | TEXT | funnel title — first thing in the offers list |
+| name | TEXT | free-form label; the offers list only searches it. Legacy `INDUSTRY:{key}` values were a routing convention, now scrubbed by `ensure-industry-field.ts` — never load or save a prospect into this field |
+| industryId | SELECT | `AUTO_PAINT_AND_BODY_SHOPS`/`WINDOW_TINTING`/`AUTO_DETAILING`/`GENERAL_TRADES` — mirrors the linked campaign's `industryId`; by-prospect serving matches `industryId[eq]:<campaign value>`; blank = not an industry offer |
 | videoMode | SELECT | `PROSPECT` (default — serve the prospect record's `videoUrl`) / `CUSTOM` (serve this row's `videoUrl` to the whole industry) |
 | heroH1 | TEXT | raw HTML from RichEditor, rendered verbatim |
 | heroLede | RICH_TEXT | `{markdown, blocknote}` — markdown holds HTML + `{{area}}` |
@@ -414,8 +444,8 @@ these rows — hosts and keys are never hardcoded and never defaulted.
 
 ```
 agencyProspect.label ──SELECT──▶ industry ──▶ agencyCampaign.industryId
-                                           ├─▶ agencyOffer  (name == INDUSTRY:{urlKey})
-                                           │     └─▶ hero/quiz/videoMode/utmSwaps/mediaLogos/carousel*/brand*
+                                            ├─▶ agencyOffer  (industryId == campaign industryId)
+                                            │     └─▶ hero/quiz/videoMode/utmSwaps/mediaLogos/carousel*/brand*
 agencyProspect.campaignId ──RELATION──▶ agencyCampaign ──ROW──▶ urlKey/funnelBaseUrl/templateBaseUrl/packDir
 agencyProspect.videoUrl ──► default funnel video (videoMode=PROSPECT)
 agencyOffer.videoUrl  ──► industry-wide override (videoMode=CUSTOM only)
@@ -423,9 +453,17 @@ agencyLead ◀── funnel capture (prospectId + quiz answers in note)
 ```
 
 Serve contract (`GET /api/public/offers/by-prospect/:key`, `:key` = id or slug):
-`INDUSTRY:{urlKey}` row + `prospectId`/`industryId` stamped on the payload + effective
-`videoUrl` resolved server-side. 404s are explicit (`Prospect not found` /
-`Industry not configured` / `Industry offer not found`) — no generic fallback.
+prospect → linked campaign (fallback: campaign whose `industryId` matches the
+prospect `label`) → the offer with that `industryId`, with `prospectId` and
+the prospect's city/region stamped on the payload and the effective `videoUrl`
+resolved server-side (`CUSTOM` override else prospect video). 404s are
+explicit (`Prospect not found` / `Industry not configured` /
+`Industry offer not found`) — no generic fallback.
+
+The builder's **Preview as prospect** cell uses the same resolution in preview
+mode (`/preview/<anything>/<offerId>?prospect=<id|slug>`): `{{area}}` and quiz
+currency tailor to that prospect without ever writing the selection to the
+offer record.
 
 Canonical reads: `prospect.label` (never raw `niche`), `phoneNumber` composite before
 `phone` TEXT, `website` TEXT, `{{area}}` from city/region, `{{currency}}` from the
@@ -451,6 +489,7 @@ Canonical reads: `prospect.label` (never raw `niche`), `phoneNumber` composite b
 - `GET /api/public/offers/by-prospect/:key` (**public** — industry offer for a prospect id or slug, with resolved video + `prospectId`), `GET /api/public/prospects/:key` (**public** — id/name/city/region/niche/currency only, no PII)
 - `POST /api/offers/logo-upload` (auth — brand-logo file upload to R2, returns `{ url }`)
 - `GET /api/prospects` — normalized prospects/leads for the picker
+- `GET /api/industries` (auth — distinct campaign industryIds as `{ key, label, urlKey }[]` for the Industry select)
 - `GET /api/health`
 
 ## Quick start
@@ -464,7 +503,7 @@ bun run dev                  # backend :4000 + frontend :3000, raw interleaved l
 ```
 
 - Frontend: http://localhost:3000 (login with Twenty credentials → `/login` → `/offers`)
-- Preview: http://localhost:3000/preview/general/:id (`?area=Springfield` resolves `{{area}}`)
+- Preview: http://localhost:3000/preview/general/:id (`?area=Springfield` resolves `{{area}}`; `?prospect=<id|slug>` tailors `{{area}}`/currency to a real prospect — preview-only, never saved)
 - Health: http://localhost:4000/api/health
 
 Create missing Twenty fields (idempotent) — prefer the seed command, which
@@ -475,7 +514,8 @@ bun run --cwd backend seed
 # …or individual scripts: src/scripts/ensure-quiz-field.ts,
 #   ensure-thankyou-field, ensure-disqualified-field, ensure-calendly-field,
 #   ensure-pixel-field, ensure-utm-field, ensure-lead-field,
-#   ensure-prospect-qual, ensure-status-cta-fields
+#   ensure-prospect-qual, ensure-status-cta-fields,
+#   ensure-industry-field (also scrubs legacy INDUSTRY:{key} offer names)
 ```
 
 Build: `bun run --cwd frontend build` (`tsc` is clean — zero errors).

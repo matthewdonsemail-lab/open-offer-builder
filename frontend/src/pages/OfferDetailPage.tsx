@@ -5,6 +5,7 @@ import { WidgetCard } from '@/components/ui/WidgetCard';
 import { Spokes } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { ProspectSelect } from '@/components/ProspectSelect';
+import { IndustrySelect } from '@/components/IndustrySelect';
 import { StatusSelect } from '@/components/common/StatusSelect';
 import { QualifierQuiz } from '@/components/QualifierQuiz';
 import type { QualifierQuizData } from '@/components/QualifierQuiz';
@@ -28,8 +29,9 @@ export function OfferDetailPage() {
   const createMutation = useCreateOffer();
 
   const [title, setTitle] = useState('');
-  const [name, setName] = useState('');
-  const [prospectName, setProspectName] = useState(''); // normalized display name
+  const [previewProspectId, setPreviewProspectId] = useState(''); // preview-only — never persisted
+  const [previewProspectName, setPreviewProspectName] = useState(''); // display name for the preview picker
+  const [industryKey, setIndustryKey] = useState(''); // campaign industryId SELECT value, '' = none
   const [heroH1, setHeroH1] = useState('');
   const [heroLede, setHeroLede] = useState('');
   const [videoUrl, setVideoUrl] = useState({ primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] as any[] });
@@ -62,10 +64,25 @@ export function OfferDetailPage() {
   const [utmSwaps, setUtmSwaps] = useState<{ rules: UtmRule[] }>({ rules: [] });  const [thankYouData, setThankYouData] = useState<ThankYouData | undefined>(undefined);
   const [disqualifiedData, setDisqualifiedData] = useState<DisqualifiedData | undefined>(undefined);
 
+  // Changing the industry invalidates any previously picked preview prospect —
+// a prospect that isn't in this industry must not be previewable against it.
+useEffect(() => {
+  setPreviewProspectId('');
+  setPreviewProspectName('');
+}, [industryKey]);
+
   useEffect(() => {
     if (offer) {
       setTitle(offer.title || '');
-      setName(offer.name || (offer as any).prospectId || '');
+      // Industry linkage is the industryId field (campaign SELECT value).
+      // Legacy "INDUSTRY:<key>" names are scrubbed by the ensure-industry-field
+      // script and are never read back — the name is a free-form label only.
+      const rawInd = (offer as any).industryId;
+      const storedInd = String(typeof rawInd === 'string' ? rawInd : (rawInd?.value ?? '')).trim();
+      setIndustryKey(storedInd);
+      // Preview-as-prospect is ephemeral UI state — never read from or written to the record.
+      setPreviewProspectId('');
+      setPreviewProspectName('');
       setHeroH1(offer.heroH1 || '');
       setHeroLede(offer.heroLede?.markdown || '');
       setVideoUrl(offer.videoUrl || { primaryLinkLabel: '', primaryLinkUrl: '', secondaryLinks: [] });
@@ -198,11 +215,10 @@ export function OfferDetailPage() {
     const buildData = (includeExtras: boolean): any => {
       const base: any = {
         ...(title && { title }),
-        ...(name && { name }),
         ...(heroH1 && { heroH1 }),
         ...(heroLede && { heroLede: { blocknote: null, markdown: heroLede } }),
         videoUrl,
-        prospectId: name || undefined,
+        industryId: industryKey || '',
         quizConfig: {
           introTitle: quizData.introTitle || undefined,
           introDesc: quizData.introDesc || undefined,
@@ -305,7 +321,8 @@ export function OfferDetailPage() {
             </button>
           ) : (
             <button
-              onClick={() => window.open(`/preview/general/${id}`, '_blank')}
+              onClick={() => window.open(previewProspectId ? `/preview/general/${id}?prospect=${encodeURIComponent(previewProspectId)}` : `/preview/general/${id}`, '_blank')}
+              title={previewProspectId ? `Preview as ${previewProspectName || previewProspectId.slice(0, 8)}` : 'Preview'}
               className="h-7 px-3 text-[13px] text-[var(--ods-text-secondary,#575757)] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] hover:bg-[var(--ods-bg-secondary,#f0f0f3)] transition-colors"
             >
               Preview
@@ -362,28 +379,50 @@ export function OfferDetailPage() {
                   className="w-full h-10 px-3 text-[13px] border border-[var(--ods-border,#e5e5ea)] rounded-[4px] bg-[var(--ods-bg-primary,#ffffff)] text-[var(--ods-text-primary,#18181b)] focus:outline-none focus:border-[var(--ods-brand-600,#2563eb)]"
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
-                  Prospect / Lead — normalized name
-                </label>
-                <ProspectSelect
-                  value={name}
-                  onChange={(id, displayName) => {
-                    setName(id);
-                    setProspectName(displayName);
-                    console.log('[OfferDetail] selected prospect:', { id, displayName });
-                  }}
-                />
-                {name && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge variant="blue">
-                      {prospectName ? `Selected: ${prospectName}` : `Selected: ${name.slice(0, 8)}…`}
-                    </Badge>
-                    <span className="text-[11px] text-[var(--ods-text-tertiary,#8a8a93)]">
-                      normalized — stored as <code className="bg-[var(--ods-bg-secondary)] px-1 py-0.5 rounded-[3px] border border-[var(--ods-border)]">name</code>
-                    </span>
-                  </div>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                    Preview as prospect
+                  </label>
+                  <ProspectSelect
+                    value={previewProspectId}
+                    industryId={industryKey || undefined}
+                    onChange={(pid, displayName) => {
+                      setPreviewProspectId(pid);
+                      setPreviewProspectName(displayName);
+                      console.log('[OfferDetail] preview as prospect:', { id: pid, displayName });
+                    }}
+                    placeholder="Pick a prospect to preview…"
+                  />
+                  {previewProspectId && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="blue">
+                        {previewProspectName ? `Previewing: ${previewProspectName}` : `Previewing: ${previewProspectId.slice(0, 8)}…`}
+                      </Badge>
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-[var(--ods-text-tertiary,#8a8a93)]">
+                    Preview-only — tailors {'{{area}}'} and quiz currency in the preview.{' '}
+                    {industryKey ? 'Limited to prospects in this industry. ' : ''}Not saved to the offer.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--ods-text-tertiary,#8a8a93)] mb-1.5">
+                    Industry — optional
+                  </label>
+                  <IndustrySelect
+                    value={industryKey}
+                    onChange={(key) => setIndustryKey(key)}
+                  />
+                  {industryKey && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="blue">Selected: {industryKey}</Badge>
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-[var(--ods-text-tertiary,#8a8a93)]">
+                    When set, this offer serves the industry funnel page for that industry. "None" = standalone offer.
+                  </p>
+                </div>
               </div>
             </div>
           </WidgetCard>
