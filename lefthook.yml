@@ -21,7 +21,7 @@ pre-push:
     - name: deploy-railcode
       cwd: railcode/offer-builder
       run: railcode deploy
-      timeout: 600
+      timeout: 10m
       globs:
         - 'railcode/offer-builder/**'
         - 'lefthook.yml'
