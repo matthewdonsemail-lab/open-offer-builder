@@ -1,6 +1,8 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Quiz } from '@/components/Quiz';
+import { LogoCarousel } from '@/components/LogoCarousel';
+import { FunnelVideo } from '@/components/FunnelVideo';
 import { resolveAreaTokens } from '@/lib/resolveTokens';
 
 interface OfferData {
@@ -25,7 +27,7 @@ interface OfferData {
 }
 
 export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'public' | 'preview'; slug?: string } = {}) {
-  const { id, industryId } = useParams<{ id: string; industryId: string }>();
+  const { id, industryId, prospectKey: prospectRouteKey } = useParams<{ id: string; industryId: string; prospectKey: string }>();
   const [offer, setOffer] = React.useState<OfferData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -37,11 +39,33 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
   // Public funnel has no :id param — fall back to the loaded offer id, then slug.
   const storageId = id || offer?.id || slug;
 
+  const prospectKey = prospectRouteKey || (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('prospect') || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const [prospect, setProspect] = React.useState<{
+    id?: string;
+    city?: string | null;
+    region?: string | null;
+    name?: string | null;
+    niche?: string | null;
+    quizCurrency?: string | null;
+  } | null>(null);
+
   React.useEffect(() => {
     async function fetchOffer() {
       try {
         const isPublic = mode === 'public';
-        const url = isPublic ? `/api/public/offers/${slug}` : `/api/offers/${id}`;
+        const offerPath = isPublic && prospectKey
+          ? `/api/public/offers/by-prospect/${encodeURIComponent(prospectKey)}`
+          : isPublic
+            ? `/api/public/offers/${slug}`
+            : `/api/offers/${id}`;
+        const url = offerPath;
         const token = isPublic ? null : localStorage.getItem('offer-builder-token');
         console.log('[PreviewPage] fetching offer', isPublic ? slug : id, 'industry', industryId, 'mode:', mode, 'token present:', !!token);
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -64,7 +88,58 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
       }
     }
     fetchOffer();
-  }, [id, industryId, mode, slug, refreshTick]);
+  }, [id, industryId, mode, slug, prospectKey, refreshTick]);
+
+  // Report CONTENT height to an embedding parent (ui-kit iframe) so it can
+  // size the frame instead of scrolling inside it on mobile. Public mode only.
+  // Measures the content wrapper — never document scrollHeight, which is
+  // floored at the viewport height and would lock the frame at whatever
+  // fallback size the parent started with.
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const lastPostedHeight = React.useRef(0);
+  React.useEffect(() => {
+    if (mode !== 'public') return;
+    const post = () => {
+      try {
+        const h = Math.ceil(contentRef.current?.offsetHeight || 0);
+        if (h > 0 && h !== lastPostedHeight.current) {
+          lastPostedHeight.current = h;
+          window.parent.postMessage({ type: 'offer:height', height: h }, '*');
+        }
+      } catch {}
+    };
+    post();
+    const ro = new ResizeObserver(post);
+    try {
+      ro.observe(document.documentElement);
+    } catch {}
+    window.addEventListener('resize', post);
+    const t = window.setInterval(post, 1500);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', post);
+      window.clearInterval(t);
+    };
+  }, [mode, quizKey, qualification, meetingBooked, leadId, offer?.id]);
+
+  // ?prospect=<id|slug> (public funnel iframes or the editor's preview-as pick)
+  // loads the prospect record so {{area}} and quiz currency tailor to it.
+  React.useEffect(() => {
+    if (!prospectKey) return;
+    let cancelled = false;
+    fetch(`/api/public/prospects/${encodeURIComponent(prospectKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!cancelled && p) {
+          setProspect(p);
+          console.log('[Preview] prospect tailored', { city: p.city, niche: p.niche });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, prospectKey]);
 
   // Save → preview bridge (preview mode only): the editor broadcasts
   // `offer:saved:<id>` on save via localStorage + postMessage; the 20s poll
@@ -265,14 +340,6 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     : [];
   const bookedVideos = (activeDoneCfg?.videos?.length || 0) > 0 ? activeDoneCfg!.videos! : fallbackVideos;
 
-  const heroHeadline = meetingBooked && activeDoneCfg?.heading ? (
-    <span>{activeDoneCfg.heading}</span>
-  ) : offer.heroH1 ? (
-    <span dangerouslySetInnerHTML={{ __html: offer.heroH1 }} />
-  ) : (
-    offer.title || 'Your Trusted Offer'
-  );
-
   const areaParam = (() => {
     try {
       return new URLSearchParams(window.location.search).get('area') || '';
@@ -281,14 +348,77 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     }
   })();
 
-  // {{area}} resolves ONLY from an explicit ?area= param — never from a
-  // prospect record. Template offers with no prospect show the dashed token.
-  const heroLedeHtml = (offer.heroLede as any)?.markdown
-    ? resolveAreaTokens((offer.heroLede as any).markdown, { area: areaParam, keepTokenIfMissing: true })
+  // {{area}} priority: explicit ?area= → linked prospect record → dashed
+  // token placeholder. Industry iframes send ?prospect= so the funnel reads
+  // the actual row instead of generic copy.
+  const area = areaParam || prospect?.city || '';
+  // Quiz currency comes from the prospect record (stamped at enrichment).
+  // Last-resort "$" only — the field should always be present.
+  const quizCurrency =
+    (typeof prospect?.quizCurrency === 'string' && prospect.quizCurrency) || '$';
+
+  // UTM swaps: ?utm_source= matches a rule authored in the UTM tab, swapping
+  // one hero field for this visit only. No match → base copy untouched.
+  const utmSwap = (() => {
+    let src = '';
+    try {
+      src = new URLSearchParams(window.location.search).get('utm_source') || '';
+    } catch { return null; }
+    if (!src) return null;
+    const raw = (offer as any).utmSwaps;
+    let rules: any = null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      rules = Array.isArray(parsed) ? parsed : parsed?.rules;
+    } catch { return null; }
+    if (!Array.isArray(rules)) return null;
+    const hit = rules.find((r: any) =>
+      typeof r?.utmSource === 'string' && r.utmSource.toLowerCase() === src.toLowerCase() &&
+      typeof r?.html === 'string' && r.html.length > 0 &&
+      (r.field === 'heroH1' || r.field === 'heroLede' || r.field === 'title'));
+    return hit || null;
+  })();
+  const effTitle = utmSwap?.field === 'title' ? utmSwap.html : offer.title;
+  const effH1 = utmSwap?.field === 'heroH1' ? utmSwap.html : offer.heroH1;
+  const effLedeMarkdown = utmSwap?.field === 'heroLede'
+    ? utmSwap.html
+    : (offer.heroLede as any)?.markdown;
+
+  const heroHeadline = meetingBooked && activeDoneCfg?.heading ? (
+    <span>{activeDoneCfg.heading}</span>
+  ) : effH1 ? (
+    <span dangerouslySetInnerHTML={{ __html: effH1 }} />
+  ) : (
+    effTitle || 'Your Trusted Offer'
+  );
+  const heroLedeHtml = effLedeMarkdown
+    ? resolveAreaTokens(effLedeMarkdown, { area, keepTokenIfMissing: true })
     : null;
 
+  // Worked-with logos live below the quiz section (never inside it).
+  const carouselLogos = (() => {
+    const raw = (offer as any)?.mediaLogos;
+    const parsed = typeof raw === 'string'
+      ? (() => { try { return JSON.parse(raw); } catch { return null; } })()
+      : raw;
+    const list = Array.isArray(parsed) ? parsed : parsed?.logos;
+    if (!Array.isArray(list)) return undefined;
+    const cleaned = list
+      .filter((l: any) => l && typeof l.src === 'string' && l.src.length > 0)
+      .map((l: any) => ({
+        src: l.src,
+        alt: typeof l.alt === 'string' ? l.alt : undefined,
+        href: typeof l.href === 'string' && l.href.length > 0 ? l.href : undefined,
+      }));
+    return cleaned.length > 0 ? cleaned : undefined;
+  })();
+
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+    <div
+      ref={contentRef}
+      className={`${mode === 'public' ? '' : 'min-h-screen '}bg-white`}
+      style={{ fontFamily: 'Satoshi, system-ui, sans-serif' }}
+    >
       {/* ===== HERO — literal copy of ui-kit/apps/web/src/pages/offer-funnel-page.tsx ===== */}
       <section
         id="offer-hero"
@@ -299,6 +429,29 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
         }}
       >
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 text-center">
+          {((offer as any)?.brandLogoUrl || (offer as any)?.brandName || (offer as any)?.brandSub) && (
+            <div className="flex items-center gap-3 text-left">
+              {(offer as any)?.brandLogoUrl && (
+                <img
+                  src={(offer as any).brandLogoUrl}
+                  alt={(offer as any)?.brandName || 'Brand logo'}
+                  className="size-11 shrink-0 rounded-[10px] object-contain"
+                />
+              )}
+              <div className="flex flex-col gap-0.5">
+                {(offer as any)?.brandName && (
+                  <p className="text-[17px] font-bold leading-tight text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                    <span dangerouslySetInnerHTML={{ __html: (offer as any).brandName }} />
+                  </p>
+                )}
+                {(offer as any)?.brandSub && (
+                  <p className="text-[13px] leading-snug text-[#0D2A4C]/60">
+                    <span dangerouslySetInnerHTML={{ __html: (offer as any).brandSub }} />
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           <h1 id="offer-heading" className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-[#0D2A4C] sm:text-5xl md:text-6xl lg:text-7xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
             {heroHeadline}
           </h1>
@@ -310,19 +463,19 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
           ) : null}
 
           {!meetingBooked && (
-            <div id="top-video" className="mx-auto w-full max-w-5xl scroll-mt-6">
+            <div id="top-video" className="mx-auto w-full max-w-2xl scroll-mt-6">
               <h2 className="mb-6 font-heading text-3xl font-bold text-[#0D2A4C] md:text-4xl lg:text-5xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                 Check out the breakdown below
               </h2>
-              <div className="overflow-hidden rounded-[24px] bg-[#F8F9FB] shadow-[0_12px_0_#F7F7F7,0_12px_20px_rgba(35,35,35,0.2)]" style={{ aspectRatio: "16/10" }}>
+              <div className="overflow-hidden rounded-[24px] border-2 border-[#0D2A4C] bg-[#F8F9FB] shadow-[0_12px_0_#0D2A4C,0_12px_28px_rgba(13,42,76,0.35)]" style={{ aspectRatio: "16/10" }}>
                 {offer.videoUrl?.primaryLinkUrl ? (
-                  <video
+                  <FunnelVideo
                     src={offer.videoUrl.primaryLinkUrl}
-                    className="size-full object-cover"
+                    title={typeof offer.title === 'string' ? offer.title : undefined}
+                    variant="controls"
                     autoPlay
                     muted
                     loop
-                    playsInline
                   />
                 ) : (
                   <div className="flex size-full min-h-[400px] items-center justify-center text-[#0D2A4C]/20">
@@ -345,13 +498,13 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                     const grid = rest.slice(0, 4);
                     return (
                       <>
-                        <div id="booked-main-video" className="overflow-hidden rounded-[24px] bg-[#F8F9FB] shadow-[0_12px_0_#F7F7F7,0_12px_20px_rgba(35,35,35,0.2)] scroll-mt-6">
+                        <div id="booked-main-video" className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)] scroll-mt-6">
                           {main.title && (
                             <p className="px-5 pt-4 text-left text-[15px] font-semibold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                               {main.title}
                             </p>
                           )}
-                          <video src={main.url} controls playsInline preload="metadata" className="w-full aspect-video" />
+                          <FunnelVideo src={main.url} title={main.title} variant="controls" className="aspect-video" />
                         </div>
                         {grid.length > 0 && (
                           <>
@@ -364,8 +517,8 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                                   <h3 className="mb-2 text-left text-[17px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                                     {v.title || `Frequently Asked Question ${i + 1}`}
                                   </h3>
-                                  <div className="overflow-hidden rounded-[24px] bg-[#F8F9FB] shadow-[0_12px_0_#F7F7F7,0_12px_20px_rgba(35,35,35,0.2)]">
-                                    <video src={v.url} controls playsInline preload="metadata" className="w-full aspect-video" />
+                                  <div className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)]">
+                                    <FunnelVideo src={v.url} title={v.title} variant="controls" className="aspect-video" />
                                   </div>
                                 </div>
                               ))}
@@ -386,9 +539,32 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
               if (!raw) return undefined;
               try {
                 const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                return Array.isArray(parsed) && parsed.length ? parsed : undefined;
+                const list = Array.isArray(parsed) ? parsed : parsed?.questions;
+                return Array.isArray(list) && list.length ? list : undefined;
               } catch { return undefined; }
             })()}
+            introTitle={(() => {
+              const raw = (offer as any).quizConfig;
+              if (!raw || typeof raw === 'string') {
+                try {
+                  const parsed = typeof raw === 'string' ? JSON.parse(raw) : null;
+                  return typeof parsed?.introTitle === 'string' ? parsed.introTitle : undefined;
+                } catch { return undefined; }
+              }
+              return typeof raw.introTitle === 'string' ? raw.introTitle : undefined;
+            })()}
+            introDesc={(() => {
+              const raw = (offer as any).quizConfig;
+              if (!raw || typeof raw === 'string') {
+                try {
+                  const parsed = typeof raw === 'string' ? JSON.parse(raw) : null;
+                  return typeof parsed?.introDesc === 'string' ? parsed.introDesc : undefined;
+                } catch { return undefined; }
+              }
+              return typeof raw.introDesc === 'string' ? raw.introDesc : undefined;
+            })()}
+            area={area}
+            currency={quizCurrency}
             calendlyUrl={(offer as any).calendlyUrl}
             disqualifiedCalendlyUrl={(() => {
               const raw = (offer as any).disqualifiedConfig;
@@ -410,6 +586,18 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
           />
           )}
         </div>
+
+        <LogoCarousel
+        logos={carouselLogos}
+        heading={typeof (offer as any)?.carouselHeading === 'string' ? (offer as any).carouselHeading : undefined}
+        descMarkdown={(() => {
+          const raw = (offer as any)?.carouselDesc;
+          if (!raw) return undefined;
+          if (typeof raw === 'string') return raw;
+          return typeof raw.markdown === 'string' ? raw.markdown : undefined;
+        })()}
+        area={area}
+      />
       </section>
 
       {mode === 'preview' && (

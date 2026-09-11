@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RichEditor } from '@/components/RichEditor';
 import {
   useFloating,
   autoUpdate,
@@ -138,31 +139,33 @@ export type QualifierQuizData = {
 const DEFAULT_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q1',
-    question: 'What is your current active census?',
+    question: 'What would {{currency}}5000 worth of extra work actually do for your business this month?',
     type: 'Multiple choice',
     options: [
-      { id: 'q1o1', text: '0-15 Clients (startup)', dq: false, fbLead: true, nextQuestion: 'Go to Q2: Do you have $5,000 (cash o' },
-      { id: 'q1o2', text: '15-40 Clients (growing)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
-      { id: 'q1o3', text: '40-99 Clients (scaling)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
-      { id: 'q1o4', text: '100+ Clients (established)', dq: false, fbLead: true, nextQuestion: 'Go to Q3: Does your home care agency' },
+      { id: 'q1o1', text: 'Be so useful', dq: false, fbLead: true, nextQuestion: '' },
+      { id: 'q1o2', text: 'Light drop in the water', dq: false, fbLead: false, nextQuestion: '' },
+      { id: 'q1o3', text: "Wouldn't do anything", dq: true, fbLead: false, nextQuestion: '' },
+      { id: 'q1o4', text: "I'm really struggling", dq: false, fbLead: false, nextQuestion: '' },
     ],
   },
   {
     id: 'q2',
-    question: 'Do you have $5,000 available to invest in growth this month?',
+    question: 'Are you the one who calls the shots on marketing?',
     type: 'Multiple choice',
     options: [
-      { id: 'q2o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
-      { id: 'q2o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
+      { id: 'q2o1', text: "Yeah, that's me", dq: false, fbLead: true, nextQuestion: '' },
+      { id: 'q2o2', text: 'I look after the marketing', dq: false, fbLead: false, nextQuestion: '' },
+      { id: 'q2o3', text: 'Nah, just having a look', dq: true, fbLead: false, nextQuestion: '' },
     ],
   },
   {
     id: 'q3',
-    question: 'Does your home care agency serve the area shown above?',
+    question: 'If this brings in work, do you want us to build it out for you?',
     type: 'Multiple choice',
     options: [
-      { id: 'q3o1', text: 'Yes', dq: false, fbLead: true, nextQuestion: '' },
-      { id: 'q3o2', text: 'No', dq: true, fbLead: false, nextQuestion: '' },
+      { id: 'q3o1', text: 'Yeah — book my call', dq: false, fbLead: true, nextQuestion: '' },
+      { id: 'q3o2', text: 'Yeah — send the details first', dq: false, fbLead: false, nextQuestion: '' },
+      { id: 'q3o3', text: 'Nah, just curious', dq: true, fbLead: false, nextQuestion: '' },
     ],
   },
 ];
@@ -257,23 +260,25 @@ export function QualifierQuiz({ value, onChange }: Props) {
         <span className="text-[11px] font-semibold tracking-widest uppercase text-[var(--ods-text-tertiary,#8a8a93)]">Qualifier Quiz</span>
       </div>
 
-      {/* Intro / qualification headline */}
+      {/* Intro / qualification headline (RichEditor: same styling + {{area}} tokens as hero copy) */}
       <div className="p-4 border-b border-[var(--ods-border,#e5e7eb)] bg-[#fafafb]/50">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div>
-            <input
+            <label className="block text-[11px] font-medium text-[var(--ods-text-tertiary)] mb-1">Intro headline</label>
+            <RichEditor
               value={data.introTitle}
-              onChange={(e) => update({ introTitle: e.target.value })}
+              onChange={(html) => update({ introTitle: html })}
               placeholder="Intro / qualification headline"
-              className="w-full h-9 px-3 text-[13px] font-medium border border-[var(--ods-border)] rounded-[6px] bg-white focus:outline-none focus:border-[var(--ods-brand-600)]"
+              showAreaToken={false}
             />
           </div>
           <div>
-            <input
+            <label className="block text-[11px] font-medium text-[var(--ods-text-tertiary)] mb-1">Supporting description</label>
+            <RichEditor
               value={data.introDesc}
-              onChange={(e) => update({ introDesc: e.target.value })}
-              placeholder="Supporting description"
-              className="w-full h-9 px-3 text-[13px] border border-[var(--ods-border)] rounded-[6px] bg-white focus:outline-none focus:border-[var(--ods-brand-600)]"
+              onChange={(html) => update({ introDesc: html })}
+              placeholder="Supporting description ({{area}} resolves to prospect city)"
+              showAreaToken
             />
           </div>
         </div>

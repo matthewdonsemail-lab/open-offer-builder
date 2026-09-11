@@ -42,6 +42,12 @@ function PublicOfferRoute() {
   return <PreviewPage mode="public" slug={slug || 'default'} />;
 }
 
+/** Industry pages: serves the offer linked to the prospect, or 404s. */
+function PublicProspectRoute() {
+  const { prospectKey } = useParams<{ prospectKey: string }>();
+  return <PreviewPage mode="public" slug="default" key={prospectKey} />;
+}
+
 export function App() {
   // Railcode edition: the session is the platform login (ctx.user in the
   // worker). No local token — prove it against /api/auth/me on boot.
@@ -100,6 +106,11 @@ export function App() {
             <Route
               path="/offer/:slug"
               element={<PublicOfferRoute />}
+            />
+            {/* Industry surface: prospect-linked offer or 404 */}
+            <Route
+              path="/offer/prospect/:prospectKey"
+              element={<PublicProspectRoute />}
             />
             <Route 
               path="/*" 

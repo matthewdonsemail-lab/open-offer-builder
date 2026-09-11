@@ -17,3 +17,14 @@ pre-push:
       run: bun run --cwd frontend typecheck
       # Backend tsc is intentionally excluded: backend/src/lib/twenty-client.ts
       # has pre-existing type errors unrelated to this gate.
+
+    - name: deploy-railcode
+      cwd: railcode/offer-builder
+      run: railcode deploy
+      timeout: 600
+      globs:
+        - 'railcode/offer-builder/**'
+        - 'lefthook.yml'
+      # The Railcode port must stay in sync with the app: any push touching
+      # it deploys to the live app so drift can't ship unnoticed. Needs the
+      # local railcode CLI authenticated (railcode login).

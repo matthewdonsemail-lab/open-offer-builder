@@ -215,24 +215,11 @@ export function DisqualifiedForm({
       </div>
 
       {/* PageEditorToolbar */}
-      <div className="flex items-center justify-between">
-        <p className="text-[12px] text-[var(--ods-text-secondary)]">Type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks. Disqualified view — no add-more videos.</p>
-        <div className="flex items-center gap-2">
-          <button className="h-7 px-3 text-[12px] font-medium border border-[var(--ods-border)] rounded-[6px] bg-white hover:bg-[var(--ods-bg-secondary)]">History</button>
-          <button className="h-7 px-3 text-[12px] font-medium border border-[var(--ods-border)] rounded-[6px] bg-white hover:bg-[var(--ods-bg-secondary)]">Reset template</button>
-          <button className="h-7 px-3 text-[12px] font-medium border border-[var(--ods-border)] rounded-[6px] bg-white hover:bg-[var(--ods-bg-secondary)]">Preview</button>
-          <button className="h-7 px-3 text-[12px] font-medium bg-[var(--ods-text-primary,#1e2126)] text-white rounded-[6px] hover:opacity-90">Save page</button>
-        </div>
-      </div>
+      <p className="text-[12px] text-[var(--ods-text-secondary)]">Type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks. Disqualified view — no add-more videos.</p>
 
       {/* EditorCanvas */}
       <div className="rounded-[8px] border border-[var(--ods-border,#e5e5e5)] bg-white p-6 space-y-6">
-        <div className="flex items-center justify-between text-[11px] text-[var(--ods-text-tertiary)]">
-          <span>Hover any block for actions · type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks</span>
-          <button className="inline-flex items-center gap-1.5 h-7 px-3 text-[12px] font-medium border border-violet-200 bg-violet-50 text-violet-700 rounded-[6px] hover:bg-violet-100">
-            <span className="text-[11px]">✎</span> Edit with AI
-          </button>
-        </div>
+        <span className="text-[11px] text-[var(--ods-text-tertiary)]">Hover any block for actions · type <code className="bg-[var(--ods-bg-secondary)] px-1 rounded">/</code> in an empty line for blocks</span>
 
         {/* BadgeBlock */}
         <div className="rounded-[6px] border border-dashed border-[var(--ods-border)] p-3 flex flex-col gap-3 bg-[#fafafb]/50">

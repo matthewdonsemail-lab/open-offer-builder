@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { resolveAreaTokens } from '@/lib/resolveTokens';
 
 export type QuizQuestion = { id: string; question: string; options: Array<string | { id?: string; text: string; dq?: boolean; fbLead?: boolean; nextQuestion?: string }> };
 
@@ -25,6 +26,13 @@ type QuizProps = {
   onQualificationChange?: (q: string) => void;
   onMeetingBooked?: (detail: MeetingBookedDetail) => void;
   questions?: QuizQuestion[];
+  /** Quiz intro header. Falls back to defaults when the offer carries none. */
+  introTitle?: string;
+  introDesc?: string;
+  /** Prospect area ("City, Region") for {{area}}/{{city}} tokens in intro copy. */
+  area?: string;
+  /** Quiz currency symbol (e.g. €) for {{currency}} tokens. From the record. */
+  currency?: string;
   calendlyUrl?: string;
   disqualifiedCalendlyUrl?: string;
   offerId?: string;
@@ -37,41 +45,50 @@ type QuizProps = {
   leadsEndpoint?: string;
 };
 
+const QUIZ_INTRO_TITLE_FALLBACK = 'See if your market is available - book a strategy call now';
+const QUIZ_INTRO_DESC_FALLBACK = 'We only work with 1 agency per market — answer a few quick questions.';
+
 const DEFAULT_QUESTIONS: QuizQuestion[] = [
   {
-    id: 'census',
-    question: 'What is your current active census?',
+    id: 'impact',
+    question: 'What would {{currency}}5000 worth of extra work actually do for your business this month?',
     options: [
-      '0-15 Clients (startup)',
-      '15-40 Clients (growing)',
-      '40-99 Clients (scaling)',
-      '100+ Clients (established)',
+      { text: 'Be so useful', fbLead: true },
+      { text: 'Light drop in the water' },
+      { text: "Wouldn't do anything", dq: true },
+      { text: "I'm really struggling" },
     ],
   },
   {
-    id: 'market',
-    question: 'What market are you looking to dominate?',
+    id: 'authority',
+    question: 'Are you the one who calls the shots on marketing?',
     options: [
-      'Your City / Region',
-      'Nearby Metro Area',
-      'Surrounding Areas',
-      'Other market',
+      { text: "Yeah, that's me", fbLead: true },
+      { text: 'I look after the marketing' },
+      { text: 'Nah, just having a look', dq: true },
     ],
   },
   {
-    id: 'goal',
-    question: 'What is your primary goal in the next 90 days?',
+    id: 'intent',
+    question: 'If this brings in work, do you want us to build it out for you?',
     options: [
-      'Add 10+ new clients',
-      'Scale operations & team',
-      'Increase MRR by $10k+',
-      'Build predictable pipeline',
+      { text: 'Yeah — book my call', fbLead: true },
+      { text: 'Yeah — send the details first' },
+      { text: 'Nah, just curious', dq: true },
     ],
   },
 ];
 
-export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, fallbackVideos, leadsEndpoint = '/api/leads' }: QuizProps) {
+export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, introTitle, introDesc, area, currency, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, fallbackVideos, leadsEndpoint = '/api/leads' }: QuizProps) {
   const qs = questions && questions.length ? questions : DEFAULT_QUESTIONS;
+  const introHeading = introTitle && introTitle.trim().length > 0 ? introTitle : QUIZ_INTRO_TITLE_FALLBACK;
+  const introLede = introDesc && introDesc.trim().length > 0 ? introDesc : QUIZ_INTRO_DESC_FALLBACK;
+  // Same RichEditor pipeline as hero copy: stored HTML + per-prospect tokens.
+  // {{currency}} resolves first (plain glyph, tag-safe), then area tokens.
+  const currencyToken = currency && currency.trim().length > 0 ? currency : '$';
+  const withCurrency = (html: string) => html.replace(/\{\{\s*currency\s*\}\}/gi, currencyToken);
+  const introHeadingHtml = resolveAreaTokens(withCurrency(introHeading), { area, keepTokenIfMissing: true });
+  const introLedeHtml = resolveAreaTokens(withCurrency(introLede), { area, keepTokenIfMissing: true });
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
@@ -153,6 +170,43 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
     }
   }, [done, isEmbed, embedSrc, isEmbedDisqualified, embedSrcDisqualified, isDisqualified]);
 
+  // The inline-widget div only mounts AFTER the lead is created, long after
+  // widget.js scans the DOM — so explicitly init it on mount. Without this
+  // the div sits blank with just its data-url attribute.
+  const embedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!leadCreated || !activeIsEmbed || !activeEmbedSrc) return;
+    const init = () => {
+      const w = (window as any).Calendly;
+      const el = embedRef.current;
+      if (w && el && typeof w.initInlineWidget === 'function') {
+        try {
+          el.innerHTML = '';
+          w.initInlineWidget({ url: activeEmbedSrc, parentElement: el });
+          console.log('[Quiz] Calendly initInlineWidget ok', activeEmbedSrc);
+          return true;
+        } catch (e) {
+          console.warn('[Quiz] Calendly init failed', e);
+        }
+      }
+      return false;
+    };
+    if (init()) return;
+    let s = document.querySelector<HTMLScriptElement>('script[src="https://assets.calendly.com/assets/external/widget.js"]');
+    if (!s) {
+      s = document.createElement('script');
+      s.src = 'https://assets.calendly.com/assets/external/widget.js';
+      s.async = true;
+      document.body.appendChild(s);
+    }
+    s.addEventListener('load', init, { once: true });
+    const t = window.setTimeout(init, 2000);
+    return () => {
+      window.clearTimeout(t);
+      s?.removeEventListener('load', init);
+    };
+  }, [leadCreated, activeIsEmbed, activeEmbedSrc]);
+
   function handleSelect(rawOpt: string | any) {
     const text = typeof rawOpt === 'string' ? rawOpt : rawOpt?.text || String(rawOpt);
     const dq = typeof rawOpt === 'object' ? !!rawOpt?.dq : false;
@@ -211,8 +265,14 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
           quizData: qs,
           source: 'offer-quiz',
           sourceUrl: window.location.href,
+          visitorId: params.get('visitor_id') || undefined,
           utmSource: params.get('utm_source') || undefined,
+          utmMedium: params.get('utm_medium') || undefined,
+          utmCampaign: params.get('utm_campaign') || undefined,
+          utmContent: params.get('utm_content') || undefined,
+          utmTerm: params.get('utm_term') || undefined,
           fbclid: params.get('fbclid') || undefined,
+          gclid: params.get('gclid') || undefined,
         }),
       });
       const data = await res.json();
@@ -246,7 +306,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
               className="text-xl font-bold text-[#0D2A4C] md:text-2xl"
               style={{ fontFamily: 'Satoshi, sans-serif' }}
             >
-              See if your market is available - book a strategy call now
+              <span dangerouslySetInnerHTML={{ __html: introHeadingHtml }} />
             </motion.h3>
             <motion.p
               initial={{ opacity: 0 }}
@@ -254,7 +314,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
               transition={{ delay: 0.18 }}
               className="mt-2 text-sm text-[#0D2A4C]/60 md:text-[15px]"
             >
-              We only work with 1 agency per market — answer a few quick questions.
+              <span dangerouslySetInnerHTML={{ __html: introLedeHtml }} />
             </motion.p>
           </div>
         )}
@@ -419,7 +479,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
 
                 {leadCreated && activeIsEmbed && activeEmbedSrc ? (
                   <div className="mt-5 rounded-xl overflow-hidden border border-[var(--ods-border,#e5e5ea)] bg-white" style={{ minWidth: 320, height: 700 }}>
-                    <div className="calendly-inline-widget" data-url={activeEmbedSrc} style={{ minWidth: 320, height: 700 }} />
+                    <div ref={embedRef} className="calendly-inline-widget" data-url={activeEmbedSrc} style={{ minWidth: 320, height: 700 }} />
                   </div>
                 ) : leadCreated && activeCalendlyUrl ? (
                   <div className="mt-5 rounded-xl overflow-hidden border border-[var(--ods-border,#e5e5ea)] bg-white" style={{ height: '640px' }}>
@@ -431,15 +491,18 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                       allow="fullscreen"
                     />
                   </div>
+                ) : leadCreated && !isDisqualified && (thankYou as any)?.hideBookingCta ? (
+                  <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
+                    <p className="text-[14px] font-semibold text-[#0D2A4C]">
+                      {(thankYou as any)?.callbackNote || "Request received — we'll call you at your preferred time."}
+                    </p>
+                  </div>
                 ) : leadCreated && !isDisqualified ? (
-                  <motion.a
-                    href="#consultation"
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="mt-5 inline-flex items-center gap-2 h-11 px-7 text-[14px] font-semibold bg-[#2563eb] text-white rounded-lg hover:bg-[#1d4ed8] transition-colors shadow-[0_4px_14px_rgba(37,99,235,0.3)]"
-                  >
-                    Book Strategy Call →
-                  </motion.a>
+                  <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
+                    <p className="text-[14px] font-semibold text-[#0D2A4C]">
+                      Thanks — we'll be in touch shortly to schedule your call.
+                    </p>
+                  </div>
                 ) : null}
 
               </motion.div>
@@ -456,12 +519,15 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                   Question {current + 1} of {qs.length}
                 </p>
                 <p className="text-center text-lg font-bold text-[#0D2A4C] md:text-xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                  {q.question}
+                  {withCurrency(q.question)}
                 </p>
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {q.options.map((rawOpt, i) => {
                     const text = typeof rawOpt === 'string' ? rawOpt : (rawOpt as any).text;
                     const key = typeof rawOpt === 'string' ? rawOpt : (rawOpt as any).id || text;
+                    // Odd-count orphan (e.g. 3rd of 3): center it as a half-width
+                    // tile instead of stranding it in row-2 col-1.
+                    const isOrphan = q.options.length % 2 === 1 && i === q.options.length - 1;
                     return (
                       <motion.button
                         key={key}
@@ -473,7 +539,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                         whileHover={{ scale: 1.04, y: -2, transition: { duration: 0.12, ease: "easeOut" } as any }}
                         whileTap={{ scale: 0.97, transition: { duration: 0.08 } as any }}
                         style={{ boxShadow: '0 0 7.0px hsl(217 91% 60% / 0.5), 0 0 19.0px hsl(217 91% 60% / 0.25)' }}
-                        className="rounded-xl border border-[var(--ods-border,#e5e7eb)] bg-white px-5 py-4 text-[14px] font-semibold text-[#0D2A4C] hover:bg-[#f0f6ff] hover:border-[#2563eb]/40 hover:shadow-[0_0_14px_hsl(217_91%_60%_/_0.35),0_4px_12px_rgba(37,99,235,0.15)] text-left sm:text-center leading-tight transform-gpu will-change-transform"
+                        className={`rounded-xl border border-[var(--ods-border,#e5e7eb)] bg-white px-5 py-4 text-[14px] font-semibold text-[#0D2A4C] hover:bg-[#f0f6ff] hover:border-[#2563eb]/40 hover:shadow-[0_0_14px_hsl(217_91%_60%_/_0.35),0_4px_12px_rgba(37,99,235,0.15)] text-left sm:text-center leading-tight transform-gpu will-change-transform${isOrphan ? ' sm:col-span-2 sm:mx-auto sm:w-[calc(50%-6px)]' : ''}`}
                       >
                         {text}
                       </motion.button>

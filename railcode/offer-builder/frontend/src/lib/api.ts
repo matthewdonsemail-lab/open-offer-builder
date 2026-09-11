@@ -62,6 +62,26 @@ export const api = {
       request<void>(`/api/offers/${id}`, {
         method: 'DELETE',
       }),
+    uploadLogo: async (file: File) => {
+      const form = new FormData();
+      form.append('logo', file, file.name);
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem('offer-builder-token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_URL}/api/offers/logo-upload`, {
+        method: 'POST',
+        headers,
+        body: form,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(body.error || `Upload failed: ${res.status}`);
+      }
+      return res.json() as Promise<{ url: string }>;
+    },
+  },
+  industries: {
+    list: () => request<Array<{ key: string; label: string; urlKey?: string }>>('/api/industries'),
   },
 };
 
