@@ -40,7 +40,7 @@ export type ThankYouData = {
 const DEFAULT_THANKYOU: ThankYouData = {
   badgeIcon: 'check',
   badgeText: "You're booked",
-  heading: "You've taken your first step towards scaling your agency, now here's your second. Please watch this short video",
+  heading: "Watch this while you wait for your call.",
   video: { title: '', hosting: 'Self-hosted' },
   videoGrid: {
     columns: 2,
