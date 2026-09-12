@@ -39,7 +39,6 @@ type QuizProps = {
   prospectId?: string;
   thankYou?: QuizDoneContent | null;
   disqualified?: QuizDoneContent | null;
-  fallbackVideos?: QuizDoneVideo[];
   /** Lead-capture endpoint. Defaults to the internal route; the public
    *  funnel at offer.domain.com passes '/api/public/leads'. */
   leadsEndpoint?: string;
@@ -79,7 +78,7 @@ const DEFAULT_QUESTIONS: QuizQuestion[] = [
   },
 ];
 
-export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, introTitle, introDesc, area, currency, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, fallbackVideos, leadsEndpoint = '/api/leads' }: QuizProps) {
+export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, introTitle, introDesc, area, currency, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, leadsEndpoint = '/api/leads' }: QuizProps) {
   const qs = questions && questions.length ? questions : DEFAULT_QUESTIONS;
   const introHeading = introTitle && introTitle.trim().length > 0 ? introTitle : QUIZ_INTRO_TITLE_FALLBACK;
   const introLede = introDesc && introDesc.trim().length > 0 ? introDesc : QUIZ_INTRO_DESC_FALLBACK;
@@ -344,26 +343,23 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
               >
                 {(() => {
                   const cfg = isDisqualified ? disqualified : thankYou;
-                  const heading =
-                    cfg?.heading ||
-                    (isDisqualified
-                      ? 'Thanks for your time — we’ll review your details and be in touch.'
-                      : 'Thanks — your call is booked. Watch this short video while you wait.');
-                  const allVideos = (cfg?.videos?.length || 0) > 0 ? cfg!.videos! : (fallbackVideos || []);
+                  const heading = cfg?.heading;
+                  const allVideos = cfg?.videos ?? [];
                   const [mainVideo, ...restVideos] = allVideos;
-                  const gridVideos = restVideos.slice(0, 4);
+                  const gridVideos = restVideos;
                   const VideoCard = ({ v, videoId }: { v: { url: string; title?: string }; videoId?: string }) => (
                     <div id={videoId} className="overflow-hidden rounded-xl border border-[var(--ods-border,#e5e7eb)] bg-black scroll-mt-6">
                       <video src={v.url} controls playsInline preload="metadata" className="w-full aspect-video" />
                     </div>
                   );
-                  const faqTitle = (v: { title?: string }, i: number) =>
-                    v.title || `Frequently Asked Question ${i + 1}`;
+                  const faqTitle = (v: { title?: string }) => v.title;
                   return (
                     <>
-                      <p className="text-[16px] font-semibold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                        {heading}
-                      </p>
+                      {heading && (
+                        <p className="text-[16px] font-semibold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                          {heading}
+                        </p>
+                      )}
                       {mainVideo && (
                         <div className="mt-6 text-left">
                           <VideoCard v={mainVideo} videoId="quiz-booked-video" />
@@ -377,9 +373,11 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                           <div id="quiz-booked-videos" className="grid gap-4 text-left sm:grid-cols-2">
                             {gridVideos.map((v, i) => (
                               <div key={i}>
-                                <h3 className="mb-2 text-left text-[15px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                                  {faqTitle(v, i)}
-                                </h3>
+                                {faqTitle(v) && (
+                                  <h3 className="mb-2 text-left text-[15px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                                    {faqTitle(v)}
+                                  </h3>
+                                )}
                                 <VideoCard v={v} />
                               </div>
                             ))}

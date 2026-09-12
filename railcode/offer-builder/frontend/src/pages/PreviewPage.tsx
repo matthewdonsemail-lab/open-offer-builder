@@ -339,12 +339,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
   const thankYouCfg = buildDoneContent((offer as any).thankYouConfig);
   const disqualifiedCfg = buildDoneContent((offer as any).disqualifiedConfig);
   const activeDoneCfg = qualification === 'DISQUALIFIED' ? disqualifiedCfg : thankYouCfg;
-  // Fall back to the offer's main video so the booked step always has video
-  // cards even when the Twenty videoGrid fields are still blank.
-  const fallbackVideos: Array<{ url: string; title?: string }> = offer.videoUrl?.primaryLinkUrl
-    ? [{ url: offer.videoUrl.primaryLinkUrl }]
-    : [];
-  const bookedVideos = (activeDoneCfg?.videos?.length || 0) > 0 ? activeDoneCfg!.videos! : fallbackVideos;
+  const bookedVideos = activeDoneCfg?.videos ?? [];
 
   const areaParam = (() => {
     try {
@@ -498,19 +493,23 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
 
 {meetingBooked ? (
             <div id="booked-content" className="mx-auto w-full max-w-3xl scroll-mt-6">
-              <div className="mb-8 text-center">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[12px] font-semibold">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  {activeDoneCfg?.badgeText || (qualification === 'DISQUALIFIED' ? 'Thanks for your interest' : "You're booked")}
-                </span>
-                <h2 className="mt-4 font-heading text-2xl font-bold leading-snug text-[#0D2A4C] sm:text-3xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                  {activeDoneCfg?.heading || (qualification === 'DISQUALIFIED'
-                    ? "Thanks for your time — we'll review your details and be in touch."
-                    : 'Now you\'re booked — here\'s what our call will cover.')}
-                </h2>
-              </div>
+              {(activeDoneCfg?.badgeText || activeDoneCfg?.heading) && (
+                <div className="mb-8 text-center">
+                  {activeDoneCfg?.badgeText && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[12px] font-semibold">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      {activeDoneCfg.badgeText}
+                    </span>
+                  )}
+                  {activeDoneCfg?.heading && (
+                    <h2 className="mt-4 font-heading text-2xl font-bold leading-snug text-[#0D2A4C] sm:text-3xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                      {activeDoneCfg.heading}
+                    </h2>
+                  )}
+                </div>
+              )}
               {bookedVideos.length > 0 ? (
                 <>
                   {(() => {
@@ -535,9 +534,11 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                             <div id="booked-videos" className={`grid gap-6 ${colClass}`}>
                               {grid.map((v, i) => (
                                 <div key={i}>
-                                  <h3 className="mb-2 text-left text-[17px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                                    {v.title || `Frequently Asked Question ${i + 1}`}
-                                  </h3>
+                                  {v.title && (
+                          <h3 className="mb-2 text-left text-[17px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                            {v.title}
+                          </h3>
+                        )}
                                   <div className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)]">
                                     <FunnelVideo src={v.url} title={v.title} variant="controls" className="aspect-video" />
                                   </div>
@@ -550,11 +551,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                     );
                   })()}
                 </>
-              ) : (
-                <p className="text-center text-[14px] text-[#0D2A4C]/60">
-                  You're all set — your confirmation is on its way to your inbox.
-                </p>
-              )}
+              ) : null}
             </div>
           ) : (
           <Quiz
@@ -607,7 +604,6 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
             onMeetingBooked={() => setMeetingBooked(true)}
             thankYou={thankYouCfg}
             disqualified={disqualifiedCfg}
-            fallbackVideos={fallbackVideos}
           />
           )}
         </div>
