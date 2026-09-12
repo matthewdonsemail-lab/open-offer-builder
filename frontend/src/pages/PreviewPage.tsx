@@ -429,7 +429,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
             "radial-gradient(ellipse 90% 60% at 50% 0%, rgba(45,141,255,0.14) 0%, rgba(45,141,255,0) 60%), #F9FCFE",
         }}
       >
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 text-center">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-14 text-center">
           {((offer as any)?.brandLogoUrl || (offer as any)?.brandName || (offer as any)?.brandSub) && (
             <div className="flex items-center gap-3 text-left">
               {(offer as any)?.brandLogoUrl && (
@@ -490,9 +490,9 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
           )}
 
 {meetingBooked ? (
-            <div id="booked-content" className="mx-auto w-full max-w-6xl scroll-mt-6">
+            <div id="booked-content" className="mx-auto flex w-full max-w-6xl scroll-mt-6 flex-col gap-10">
               {(activeDoneCfg?.badgeText || activeDoneCfg?.heading) && (
-                <div className="mb-12 text-center">
+                <div className="text-center">
                   {activeDoneCfg?.badgeText && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[12px] font-semibold">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -525,11 +525,11 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                           <FunnelVideo src={main.url} title={main.title} variant="controls" autoPlay muted className="aspect-video" />
                         </div>
 {grid.length > 0 && (
-                            <div id="booked-videos" className={`mt-16 grid gap-8 ${colClass}`}>
+                            <div id="booked-videos" className={`grid gap-8 ${colClass}`}>
                               {grid.map((v, i) => (
                                 <div key={i}>
                                   {v.title && (
-                          <h3 className="mb-2 text-left text-[17px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                          <h3 className="mb-2 text-left text-xl font-bold text-[#0D2A4C] md:text-2xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                             {v.title}
                           </h3>
                         )}

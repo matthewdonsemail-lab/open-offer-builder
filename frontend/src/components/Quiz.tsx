@@ -340,7 +340,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                             {gridVideos.map((v, i) => (
                               <div key={i}>
                                 {faqTitle(v) && (
-                                  <h3 className="mb-2 text-left text-[15px] font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                                  <h3 className="mb-2 text-left text-xl font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                                     {faqTitle(v)}
                                   </h3>
                                 )}

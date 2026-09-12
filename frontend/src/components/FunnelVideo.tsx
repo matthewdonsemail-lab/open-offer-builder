@@ -35,7 +35,7 @@ export function FunnelVideo({
   if (variant === 'autoplay') {
     return (
       <MediaPlayer
-        className={`block size-full ${className}`}
+        className={`block w-full ${className}`}
         title={title}
         src={src}
         autoPlay
@@ -52,14 +52,14 @@ export function FunnelVideo({
 
   return (
     <MediaPlayer
-      className={`block size-full ${className}`}
+      className={`block w-full ${className}`}
       title={title}
       src={src}
       autoPlay={autoPlay}
       muted={muted}
       loop={loop}
       playsInline
-      preload="metadata"
+      preload={autoPlay ? 'auto' : 'metadata'}
       style={{ '--video-brand': '#0D2A4C' } as CSSProperties}
     >
       <MediaOutlet />
