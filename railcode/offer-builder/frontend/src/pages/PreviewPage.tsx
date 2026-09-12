@@ -490,9 +490,9 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
           )}
 
 {meetingBooked ? (
-            <div id="booked-content" className="mx-auto w-full max-w-3xl scroll-mt-6">
+            <div id="booked-content" className="mx-auto w-full max-w-6xl scroll-mt-6">
               {(activeDoneCfg?.badgeText || activeDoneCfg?.heading) && (
-                <div className="mb-8 text-center">
+                <div className="mb-12 text-center">
                   {activeDoneCfg?.badgeText && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[12px] font-semibold">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -516,16 +516,16 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                     const colClass = activeDoneCfg?.columns === 1 ? 'grid-cols-1' : activeDoneCfg?.columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
                     return (
                       <>
-                        <div id="booked-main-video" className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)] scroll-mt-6">
+                        <div id="booked-main-video" className="scroll-mt-6">
                           {main.title && (
                             <p className="px-5 pt-4 text-left text-[15px] font-semibold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                               {main.title}
                             </p>
                           )}
-                          <FunnelVideo src={main.url} title={main.title} variant="controls" className="aspect-video" />
+                          <FunnelVideo src={main.url} title={main.title} variant="controls" autoPlay muted className="aspect-video" />
                         </div>
 {grid.length > 0 && (
-                            <div id="booked-videos" className={`mt-12 grid gap-6 ${colClass}`}>
+                            <div id="booked-videos" className={`mt-16 grid gap-8 ${colClass}`}>
                               {grid.map((v, i) => (
                                 <div key={i}>
                                   {v.title && (
@@ -533,7 +533,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                             {v.title}
                           </h3>
                         )}
-                                  <div className="overflow-hidden rounded-[24px] border-2 border-[#2563eb] bg-[#F8F9FB] shadow-[0_12px_0_#2563eb,0_12px_28px_rgba(37,99,235,0.35)]">
+                                  <div>
                                     <FunnelVideo src={v.url} title={v.title} variant="controls" className="aspect-video" />
                                   </div>
                                 </div>
