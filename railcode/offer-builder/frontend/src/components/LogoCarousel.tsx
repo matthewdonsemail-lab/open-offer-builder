@@ -8,15 +8,13 @@ export type LogoCarouselLogo = {
 
 type LogoCarouselProps = {
   logos?: LogoCarouselLogo[];
-  /** Heading HTML (RichEditor). Falls back when blank. */
+  /** Heading HTML (RichEditor). Hidden when blank. */
   heading?: string;
   /** Description markdown (RichEditor, {{area}} supported). Hidden when blank. */
   descMarkdown?: string;
   /** Prospect area for {{area}}/{{city}} tokens. */
   area?: string;
 };
-
-const DEFAULT_HEADING = "We've worked with";
 
 /**
  * Worked-with logo carousel rendered BELOW the quiz (never inside it).
@@ -32,6 +30,7 @@ export function LogoCarousel({ logos, heading, descMarkdown, area }: LogoCarouse
     href: typeof l.href === 'string' && l.href.length > 0 ? l.href : undefined,
   }));
   if (cleaned.length === 0) return null;
+  const hasHeading = !!(heading && heading.trim().length > 0);
   // One seamless unit must overflow the viewport on its own, otherwise the
   // loop shows empty space. Repeat the set (cap total at 40 nodes), then
   // duplicate the unit — translateX(-50%) lands exactly on the seam.
@@ -40,10 +39,9 @@ export function LogoCarousel({ logos, heading, descMarkdown, area }: LogoCarouse
   for (let r = 0; r < reps; r++) unit.push(...cleaned);
   const row = [...unit, ...unit];
 
-  const headingHtml = resolveAreaTokens(
-    heading && heading.trim().length > 0 ? heading : DEFAULT_HEADING,
-    { area, keepTokenIfMissing: true },
-  );
+  const headingHtml = hasHeading
+    ? resolveAreaTokens(heading, { area, keepTokenIfMissing: true })
+    : null;
   const descHtml =
     descMarkdown && descMarkdown.trim().length > 0
       ? resolveAreaTokens(descMarkdown, { area, keepTokenIfMissing: true })
@@ -52,12 +50,14 @@ export function LogoCarousel({ logos, heading, descMarkdown, area }: LogoCarouse
   return (
     <section className="mx-auto w-full max-w-5xl px-6 pb-16 pt-14">
       <style>{`@keyframes logo-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}.logo-marquee-track{animation:logo-marquee 64s linear infinite}.logo-marquee:hover .logo-marquee-track{animation-play-state:paused}`}</style>
-      <h2
-        className="mb-6 text-center font-heading text-2xl font-bold text-[#0D2A4C] md:text-3xl"
-        style={{ fontFamily: 'Satoshi, sans-serif' }}
-      >
-        <span dangerouslySetInnerHTML={{ __html: headingHtml }} />
-      </h2>
+      {headingHtml && (
+        <h2
+          className="mb-6 text-center font-heading text-2xl font-bold text-[#0D2A4C] md:text-3xl"
+          style={{ fontFamily: 'Satoshi, sans-serif' }}
+        >
+          <span dangerouslySetInnerHTML={{ __html: headingHtml }} />
+        </h2>
+      )}
       <div className="logo-marquee overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
         <div className="logo-marquee-track flex w-max items-center gap-14 pr-14">
           {row.map((logo, i) => {

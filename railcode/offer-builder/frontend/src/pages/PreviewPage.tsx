@@ -386,10 +386,11 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
     : (offer.heroLede as any)?.markdown;
 
   // H1 only renders pre-booking; the booked view carries its own header.
+  const hasHeroHeadline = !!(effH1 || effTitle);
   const heroHeadline = effH1 ? (
     <span dangerouslySetInnerHTML={{ __html: effH1 }} />
   ) : (
-    effTitle || 'Your Trusted Offer'
+    effTitle
   );
   const heroLedeHtml = effLedeMarkdown
     ? resolveAreaTokens(effLedeMarkdown, { area, keepTokenIfMissing: true })
@@ -452,7 +453,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
               </div>
             </div>
           )}
-          {!meetingBooked && (
+          {!meetingBooked && hasHeroHeadline && (
             <h1 id="offer-heading" className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-[#0D2A4C] sm:text-5xl md:text-6xl lg:text-7xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
               {heroHeadline}
             </h1>
@@ -466,9 +467,6 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
 
           {!meetingBooked && (
             <div id="top-video" className="mx-auto w-full max-w-2xl scroll-mt-6">
-              <h2 className="mb-6 font-heading text-3xl font-bold text-[#0D2A4C] md:text-4xl lg:text-5xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                Check out the breakdown below
-              </h2>
               <div className="overflow-hidden rounded-[24px] border-2 border-[#0D2A4C] bg-[#F8F9FB] shadow-[0_12px_0_#0D2A4C,0_12px_28px_rgba(13,42,76,0.35)]" style={{ aspectRatio: "16/10" }}>
                 {offer.videoUrl?.primaryLinkUrl ? (
                   <FunnelVideo
@@ -526,12 +524,8 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                           )}
                           <FunnelVideo src={main.url} title={main.title} variant="controls" className="aspect-video" />
                         </div>
-                        {grid.length > 0 && (
-                          <>
-                            <h2 id="booked-faq-heading" className="mt-12 mb-6 text-center font-heading text-3xl font-bold text-[#0D2A4C] md:text-4xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                              Frequently Asked Questions
-                            </h2>
-                            <div id="booked-videos" className={`grid gap-6 ${colClass}`}>
+{grid.length > 0 && (
+                            <div id="booked-videos" className={`mt-12 grid gap-6 ${colClass}`}>
                               {grid.map((v, i) => (
                                 <div key={i}>
                                   {v.title && (
@@ -545,8 +539,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                                 </div>
                               ))}
                             </div>
-                          </>
-                        )}
+                          )}
                       </>
                     );
                   })()}

@@ -26,7 +26,7 @@ type QuizProps = {
   onQualificationChange?: (q: string) => void;
   onMeetingBooked?: (detail: MeetingBookedDetail) => void;
   questions?: QuizQuestion[];
-  /** Quiz intro header. Falls back to defaults when the offer carries none. */
+  /** Quiz intro header. Hidden when the offer carries none. */
   introTitle?: string;
   introDesc?: string;
   /** Prospect area ("City, Region") for {{area}}/{{city}} tokens in intro copy. */
@@ -44,44 +44,10 @@ type QuizProps = {
   leadsEndpoint?: string;
 };
 
-const QUIZ_INTRO_TITLE_FALLBACK = 'See if your market is available - book a strategy call now';
-const QUIZ_INTRO_DESC_FALLBACK = 'We only work with 1 agency per market — answer a few quick questions.';
-
-const DEFAULT_QUESTIONS: QuizQuestion[] = [
-  {
-    id: 'impact',
-    question: 'What would {{currency}}5000 worth of extra work actually do for your business this month?',
-    options: [
-      { text: 'Be so useful', fbLead: true },
-      { text: 'Light drop in the water' },
-      { text: "Wouldn't do anything", dq: true },
-      { text: "I'm really struggling" },
-    ],
-  },
-  {
-    id: 'authority',
-    question: 'Are you the one who calls the shots on marketing?',
-    options: [
-      { text: "Yeah, that's me", fbLead: true },
-      { text: 'I look after the marketing' },
-      { text: 'Nah, just having a look', dq: true },
-    ],
-  },
-  {
-    id: 'intent',
-    question: 'If this brings in work, do you want us to build it out for you?',
-    options: [
-      { text: 'Yeah — book my call', fbLead: true },
-      { text: 'Yeah — send the details first' },
-      { text: 'Nah, just curious', dq: true },
-    ],
-  },
-];
-
 export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeetingBooked, questions, introTitle, introDesc, area, currency, calendlyUrl, disqualifiedCalendlyUrl, offerId, prospectId, thankYou, disqualified, leadsEndpoint = '/api/leads' }: QuizProps) {
-  const qs = questions && questions.length ? questions : DEFAULT_QUESTIONS;
-  const introHeading = introTitle && introTitle.trim().length > 0 ? introTitle : QUIZ_INTRO_TITLE_FALLBACK;
-  const introLede = introDesc && introDesc.trim().length > 0 ? introDesc : QUIZ_INTRO_DESC_FALLBACK;
+  const qs = questions && questions.length ? questions : [];
+  const introHeading = introTitle && introTitle.trim().length > 0 ? introTitle : '';
+  const introLede = introDesc && introDesc.trim().length > 0 ? introDesc : '';
   // Same RichEditor pipeline as hero copy: stored HTML + per-prospect tokens.
   // {{currency}} resolves first (plain glyph, tag-safe), then area tokens.
   const currencyToken = currency && currency.trim().length > 0 ? currency : '$';
@@ -146,7 +112,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
     return () => window.clearTimeout(t);
   }, [meetingBooked]);
 
-  const progress = done ? 100 : (current / qs.length) * 100;
+  const progress = done ? 100 : qs.length ? (current / qs.length) * 100 : 0;
   const q = qs[current];
 
   const isEmbed = !!calendlyUrl && (calendlyUrl.includes('calendly-inline-widget') || calendlyUrl.includes('data-url='));
@@ -296,25 +262,29 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="relative mx-auto mt-4 max-w-2xl rounded-2xl border border-[var(--ods-border,#e5e7eb)] bg-white p-6 shadow-sm md:p-8"
       >
-        {!meetingBooked && (
+        {!meetingBooked && (introHeading || introLede) && (
           <div className="text-center">
-            <motion.h3
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-xl font-bold text-[#0D2A4C] md:text-2xl"
-              style={{ fontFamily: 'Satoshi, sans-serif' }}
-            >
-              <span dangerouslySetInnerHTML={{ __html: introHeadingHtml }} />
-            </motion.h3>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.18 }}
-              className="mt-2 text-sm text-[#0D2A4C]/60 md:text-[15px]"
-            >
-              <span dangerouslySetInnerHTML={{ __html: introLedeHtml }} />
-            </motion.p>
+            {introHeading && (
+              <motion.h3
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-xl font-bold text-[#0D2A4C] md:text-2xl"
+                style={{ fontFamily: 'Satoshi, sans-serif' }}
+              >
+                <span dangerouslySetInnerHTML={{ __html: introHeadingHtml }} />
+              </motion.h3>
+            )}
+            {introLede && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.18 }}
+                className="mt-2 text-sm text-[#0D2A4C]/60 md:text-[15px]"
+              >
+                <span dangerouslySetInnerHTML={{ __html: introLedeHtml }} />
+              </motion.p>
+            )}
           </div>
         )}
 
@@ -366,11 +336,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                         </div>
                       )}
                       {gridVideos.length > 0 && (
-                        <>
-                          <h2 id="quiz-faq-heading" className="mt-8 mb-4 text-center text-xl font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                            Frequently Asked Questions
-                          </h2>
-                          <div id="quiz-booked-videos" className="grid gap-4 text-left sm:grid-cols-2">
+                          <div id="quiz-booked-videos" className="mt-8 grid gap-4 text-left sm:grid-cols-2">
                             {gridVideos.map((v, i) => (
                               <div key={i}>
                                 {faqTitle(v) && (
@@ -381,9 +347,8 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                                 <VideoCard v={v} />
                               </div>
                             ))}
-                          </div>
-                        </>
-                      )}
+                            </div>
+                          )}
                     </>
                   );
                 })()}
@@ -407,10 +372,6 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </motion.div>
-                <h4 id="quiz-done-heading" className="text-lg font-bold text-[#0D2A4C] md:text-xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                  {isDisqualified ? 'Thanks for your interest' : "You're a great fit — let's talk!"}
-                </h4>
-                <p className="mt-1 text-sm text-[#0D2A4C]/60">{isDisqualified ? 'Based on your answers you may not be a fit right now, but leave your details and we’ll review.' : 'Your market may still be available. Book your strategy call below.'}</p>
 
                 {!leadCreated ? (
                   <form id="quiz-contact-form" onSubmit={handleLeadSubmit} className="mt-6 text-left space-y-3 max-w-md mx-auto">
@@ -453,27 +414,22 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                       {submitting ? 'Submitting...' : isDisqualified ? 'Submit for review' : 'Submit & Continue →'}
                     </button>
                   </form>
-                ) : (
-                  <div className="mt-4 p-4 rounded-xl border border-[var(--ods-border,#e5e7eb)] bg-[var(--ods-bg-secondary,#f8f9fc)] text-center">
-                    {(() => {
-                      const cfg = isDisqualified ? disqualified : thankYou;
-                      const badge = cfg?.badgeText || (isDisqualified ? 'Thanks for your interest' : "You're booked");
-                      const heading =
-                        cfg?.heading ||
-                        (isDisqualified
-                          ? 'Thanks for your time — we’ll review your details and be in touch.'
-                          : 'Thanks — you can now book your call below.');
-                      return (
-                        <>
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[var(--ods-brand-600,#2563eb)] text-white text-[12px] font-medium">
-                            {badge}
-                          </span>
-                          <p className="mt-2 text-[14px] font-medium text-[#0D2A4C]">{heading}</p>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                ) : (() => {
+                  const cfg = isDisqualified ? disqualified : thankYou;
+                  const badge = cfg?.badgeText;
+                  const heading = cfg?.heading;
+                  if (!badge && !heading) return null;
+                  return (
+                    <div className="mt-4 p-4 rounded-xl border border-[var(--ods-border,#e5e7eb)] bg-[var(--ods-bg-secondary,#f8f9fc)] text-center">
+                      {badge && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[var(--ods-brand-600,#2563eb)] text-white text-[12px] font-medium">
+                          {badge}
+                        </span>
+                      )}
+                      {heading && <p className="mt-2 text-[14px] font-medium text-[#0D2A4C]">{heading}</p>}
+                    </div>
+                  );
+                })()}
 
                 {leadCreated && activeIsEmbed && activeEmbedSrc ? (
                   <div className="mt-5 rounded-xl overflow-hidden border border-[var(--ods-border,#e5e5ea)] bg-white" style={{ minWidth: 320, height: 700 }}>
@@ -489,22 +445,16 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                       allow="fullscreen"
                     />
                   </div>
-                ) : leadCreated && !isDisqualified && (thankYou as any)?.hideBookingCta ? (
+                ) : leadCreated && !isDisqualified && (thankYou as any)?.callbackNote ? (
                   <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
                     <p className="text-[14px] font-semibold text-[#0D2A4C]">
-                      {(thankYou as any)?.callbackNote || "Request received — we'll call you at your preferred time."}
-                    </p>
-                  </div>
-                ) : leadCreated && !isDisqualified ? (
-                  <div className="mt-5 rounded-xl border border-[var(--ods-border,#e5e5ea)] bg-[var(--ods-bg-secondary,#f8f9fc)] px-6 py-5 text-center">
-                    <p className="text-[14px] font-semibold text-[#0D2A4C]">
-                      Thanks — we'll be in touch shortly to schedule your call.
+                      {(thankYou as any)?.callbackNote}
                     </p>
                   </div>
                 ) : null}
 
               </motion.div>
-            ) : (
+            ) : q ? (
               <motion.div
                 key={q.id}
                 id="quiz-questions"
@@ -545,7 +495,7 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                   })}
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
       </motion.div>
