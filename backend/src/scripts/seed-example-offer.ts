@@ -79,7 +79,7 @@ const payload = {
   thankYouConfig: {
     badgeIcon: "check",
     badgeText: "You're booked",
-    heading: "Watch this while you wait for your call.",
+    heading: "Now you're booked — here's what our call will cover.",
     video: { title: "", hosting: "Self-hosted" },
     videoGrid: {
       columns: 2,

@@ -508,7 +508,7 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                 <h2 className="mt-4 font-heading text-2xl font-bold leading-snug text-[#0D2A4C] sm:text-3xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                   {activeDoneCfg?.heading || (qualification === 'DISQUALIFIED'
                     ? "Thanks for your time — we'll review your details and be in touch."
-                    : 'Watch this while you wait for your call.')}
+                    : 'Now you\'re booked — here\'s what our call will cover.')}
                 </h2>
               </div>
               {bookedVideos.length > 0 ? (
