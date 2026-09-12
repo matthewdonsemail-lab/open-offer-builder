@@ -526,8 +526,16 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                         </div>
 {grid.length > 0 && (
                             <div id="booked-videos" className={`grid gap-8 ${colClass}`}>
-                              {grid.map((v, i) => (
-                                <div key={i}>
+                              {grid.map((v, i) => {
+                                // Odd-count orphan (e.g. 3rd of 3 in 2-col): center it
+                                // as a half-width tile instead of stranding it left.
+                                const isOrphan =
+                                  activeDoneCfg?.columns !== 1 &&
+                                  activeDoneCfg?.columns !== 3 &&
+                                  grid.length % 2 === 1 &&
+                                  i === grid.length - 1;
+                                return (
+                                  <div key={i} className={isOrphan ? 'sm:col-span-2 sm:mx-auto sm:w-[calc(50%-16px)]' : undefined}>
                                   {v.title && (
                           <h3 className="mb-2 text-left text-xl font-bold text-[#0D2A4C] md:text-2xl" style={{ fontFamily: 'Satoshi, sans-serif' }}>
                             {v.title}
@@ -537,7 +545,8 @@ export function PreviewPage({ mode = 'preview', slug = 'default' }: { mode?: 'pu
                                     <FunnelVideo src={v.url} title={v.title} variant="controls" className="aspect-video" />
                                   </div>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                       </>

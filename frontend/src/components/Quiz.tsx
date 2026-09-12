@@ -337,16 +337,19 @@ export function Quiz({ onComplete, onLeadCreated, onQualificationChange, onMeeti
                       )}
                       {gridVideos.length > 0 && (
                           <div id="quiz-booked-videos" className="mt-8 grid gap-4 text-left sm:grid-cols-2">
-                            {gridVideos.map((v, i) => (
-                              <div key={i}>
-                                {faqTitle(v) && (
-                                  <h3 className="mb-2 text-left text-xl font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
-                                    {faqTitle(v)}
-                                  </h3>
-                                )}
-                                <VideoCard v={v} />
-                              </div>
-                            ))}
+                            {gridVideos.map((v, i) => {
+                              const isOrphan = gridVideos.length % 2 === 1 && i === gridVideos.length - 1;
+                              return (
+                                <div key={i} className={isOrphan ? 'sm:col-span-2 sm:mx-auto sm:w-[calc(50%-8px)]' : undefined}>
+                                  {faqTitle(v) && (
+                                    <h3 className="mb-2 text-left text-xl font-bold text-[#0D2A4C]" style={{ fontFamily: 'Satoshi, sans-serif' }}>
+                                      {faqTitle(v)}
+                                    </h3>
+                                  )}
+                                  <VideoCard v={v} />
+                                </div>
+                              );
+                            })}
                             </div>
                           )}
                     </>
